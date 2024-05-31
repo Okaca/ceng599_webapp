@@ -43,6 +43,7 @@ def get_a101_chartdata(keyword: KeywordModel):
     # initialize data
     data = []
     for item in market_items_list:
-        data.append({"value": item["price"], "date": item["scrapedDate"]})
+        price_str = item["price"].replace(",", ".")
+        data.append({"value": price_str, "date": item["scrapedDate"]})
 
     return data

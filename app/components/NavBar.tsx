@@ -7,7 +7,9 @@ const NavBar = () => {
 
   const handleRedirect = () => {
     router.push("/");
-    window.location.reload();
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000); // Add a slight delay before reloading
   };
 
   return (
