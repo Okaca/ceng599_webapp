@@ -7,6 +7,7 @@ const NavBar = () => {
 
   const handleRedirect = () => {
     router.push("/");
+    window.location.reload();
   };
 
   return (
