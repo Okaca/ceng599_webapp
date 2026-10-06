@@ -1,35 +1,43 @@
 import os
 
 from dotenv import load_dotenv
-from psycopg.conninfo import make_conninfo
-from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
+from sqlalchemy import URL, create_engine, text
+from sqlalchemy.orm import Session, sessionmaker
 
 # Same variables the marketScraper uses, read from the environment or a .env file
 load_dotenv()
 
-conninfo = make_conninfo(
+url = URL.create(
+    "postgresql+psycopg",
     host=os.getenv("POSTGRES_HOST", "localhost"),
-    port=os.getenv("POSTGRES_PORT", "5432"),
-    dbname=os.getenv("POSTGRES_DB"),
-    user=os.getenv("POSTGRES_USER"),
+    port=int(os.getenv("POSTGRES_PORT", "5432")),
+    database=os.getenv("POSTGRES_DB"),
+    username=os.getenv("POSTGRES_USER"),
     password=os.getenv("POSTGRES_PASSWORD"),
 )
 
-# Rows come back as dicts keyed by column name, e.g. row["image_url"]
-pool = ConnectionPool(
-    conninfo,
-    min_size=1,
-    max_size=10,
-    kwargs={"row_factory": dict_row, "autocommit": True},  # returns rows as dicts
-    open=False,
+# The API only reads, so queries run without wrapping each request in a transaction
+engine = create_engine(
+    url,
+    pool_size=5,
+    max_overflow=5,
+    pool_pre_ping=True,
+    isolation_level="AUTOCOMMIT",
+    connect_args={"connect_timeout": 5},  # seconds; fail fast if Postgres is down
 )
+SessionLocal = sessionmaker(engine)
 
-# Open the pool and check the connection once at startup
+
+def get_session():
+    """FastAPI dependency: one session per request, closed when the request ends"""
+    with SessionLocal() as session:
+        yield session
+
+
+# Check the connection once at startup
 try:
-    pool.open(wait=True, timeout=10)
-    with pool.connection() as conn:
-        conn.execute("SELECT 1")
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
     print("Successfully connected to PostgreSQL!")
 except Exception as e:
     print(e)

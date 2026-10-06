@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-# NUMERIC columns arrive from psycopg as Decimal; they are declared as float so
-# the JSON response carries numbers (pydantic would serialize Decimal as "12.50")
+# Response shapes, built from the entities in api/entity/entities.py.
+# NUMERIC columns arrive as Decimal; they are declared as float so the JSON
+# response carries numbers (pydantic would serialize Decimal as "12.50")
 
 
 class Product(BaseModel):
@@ -24,6 +25,11 @@ class Product(BaseModel):
 
 class Price(BaseModel):
     """A row of prices: one product's price in one store on one day"""
+
+    # Lets model_validate read a db.Price entity's attributes (price.in_stock, ...)
+    # instead of requiring a dict; pydantic v1 called this orm_mode. ProductWithPrice
+    # doesn't need it: the serializer merges its sources into a dict first
+    model_config = ConfigDict(from_attributes=True)
 
     price: float
     regular_price: Optional[float] = None
