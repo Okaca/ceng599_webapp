@@ -1,41 +1,38 @@
 "use client";
-import { useEffect, useState } from "react";
-import Dataprovider from "../dataProvider/dataProvider";
+import { useState } from "react";
 import { Category } from "../types";
 
-const dp = new Dataprovider();
-
 interface SideBarProps {
-  selected: Category | null;
-  onCategorySelect: (category: Category | null) => void;
+  categories: Category[];
+  selected: string | null; // the selected category's slug
+  onCategorySelect: (slug: string | null) => void;
 }
 
-// The category tree from the API: main > sub. Clicking a category selects
-// it and opens its subcategories.
-const SideBar: React.FC<SideBarProps> = ({ selected, onCategorySelect }) => {
-  const [categories, setCategories] = useState<Category[]>([]);
-  // slugs of the categories whose children are shown
-  const [open, setOpen] = useState<Set<string>>(new Set());
+// The category tree: main > sub. Clicking a category selects it and opens its
+// subcategories; the branch of the selected category is always open.
+const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelect }) => {
+  // slugs of the categories the user opened or closed by clicking
+  const [toggled, setToggled] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    dp.getCategories().then(setCategories);
-  }, []);
+  // A category picked from the search bar opens its main category too
+  const isOpen = (slug: string) =>
+    toggled.has(slug) !== (selected !== null && selected.startsWith(slug + "/"));
 
   const handleClick = (category: Category) => {
-    setOpen((current) => {
+    setToggled((current) => {
       const next = new Set(current);
       if (next.has(category.slug)) next.delete(category.slug);
       else next.add(category.slug);
       return next;
     });
-    onCategorySelect(category);
+    onCategorySelect(category.slug);
   };
 
   const renderCategory = (category: Category, depth: number) => (
     <div key={category.slug}>
       <div
         className={`flex items-center justify-between py-2 pr-4 cursor-pointer hover:bg-gray-700 ${
-          selected?.slug === category.slug ? "bg-gray-700 font-bold" : ""
+          selected === category.slug ? "bg-gray-700 font-bold" : ""
         }`}
         style={{ paddingLeft: `${16 + depth * 16}px` }}
         onClick={() => handleClick(category)}
@@ -44,7 +41,7 @@ const SideBar: React.FC<SideBarProps> = ({ selected, onCategorySelect }) => {
         {category.children.length > 0 && (
           <svg
             className={`w-5 h-5 transform transition-transform ${
-              open.has(category.slug) ? "rotate-90" : ""
+              isOpen(category.slug) ? "rotate-90" : ""
             }`}
             fill="none"
             stroke="currentColor"
@@ -60,7 +57,7 @@ const SideBar: React.FC<SideBarProps> = ({ selected, onCategorySelect }) => {
           </svg>
         )}
       </div>
-      {open.has(category.slug) &&
+      {isOpen(category.slug) &&
         category.children.map((child) => renderCategory(child, depth + 1))}
     </div>
   );

@@ -1,12 +1,12 @@
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session, contains_eager
 from api.config.config import get_session
 from api.entity import entities as db
-from api.model.model import CategoryNode, Price, ProductPage, ProductWithPrice
+from api.model.model import CategoryNode, Price, ProductPage, ProductWithPrice, Suggestions
 from api.serializer.serializer import convertPrices, convertProduct, convertProducts
 
 marketApi = APIRouter(prefix="/api")
@@ -41,6 +41,15 @@ def products_on(day: date) -> Select:
         .ext(distinct_on(db.Product.id))
         .order_by(db.Product.id, db.Price.price)
     )
+
+
+def matches(column, q: str):
+    """True when every word of q appears in the column, ignoring case and Turkish letters.
+    Both sides go through search_fold() (marketScraper/db/init.sql), which the trigram
+    index on product names is built on."""
+    words = q.split()[:5]
+    patterns = ["%" + w.replace("/", "//").replace("%", "/%").replace("_", "/_") + "%" for w in words]
+    return and_(*[func.search_fold(column).like(func.search_fold(p), escape="/") for p in patterns])
 
 
 def in_category(query: Select, slug: str) -> Select:
@@ -86,18 +95,21 @@ def get_categories(session: Session = Depends(get_session)):
 def get_products(
     market: Optional[Market] = None,
     category: Optional[str] = Query(None, description="A category slug, e.g. sut-kahvaltilik/peynir"),
+    q: Optional[str] = Query(None, max_length=100, description="Words the product name must contain"),
     day: Optional[date] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
     session: Session = Depends(get_session),
 ):
     """One page of products priced on day (default: the market's last scrape day),
-    optionally of one market and one category"""
+    optionally of one market and one category, and matching a search"""
     query = products_on(day or latest_day(session, market))
     if market:
         query = query.where(db.Market.name == market)
     if category:
         query = in_category(query, category)
+    if q and q.strip():
+        query = query.where(matches(db.Product.name, q))
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     rows = session.execute(query.limit(page_size).offset((page - 1) * page_size))
     return {
@@ -105,6 +117,40 @@ def get_products(
         "total": total,
         "page": page,
         "page_size": page_size,
+    }
+
+
+@marketApi.get("/suggestions", response_model=Suggestions)
+def get_suggestions(
+    q: str = Query(..., min_length=2, max_length=100), session: Session = Depends(get_session)
+):
+    """Categories and products whose names contain every word of q, for the search bar"""
+    parent = db.Category.__table__.alias("parent")
+    categories = session.execute(
+        select(db.Category.name, db.Category.slug, parent.c.name)
+        .outerjoin(parent, parent.c.id == db.Category.parent_id)
+        .where(matches(db.Category.name, q))
+        .order_by(db.Category.position)
+        .limit(5)
+    )
+    # Only products still on sale: priced in the last week. Shorter names first, as
+    # they are usually the plain product ("Starking Elma Kg" before "Starking Elma Suyu 1 L")
+    recent = datetime.now(ISTANBUL) - timedelta(days=7)
+    products = session.execute(
+        select(db.Product.id, db.Product.name, db.Market.name)
+        .join(db.Product.market)
+        .where(
+            matches(db.Product.name, q),
+            select(db.Price.id)
+            .where(db.Price.product_id == db.Product.id, db.Price.scraped_at >= recent)
+            .exists(),
+        )
+        .order_by(func.length(db.Product.name), db.Product.name)
+        .limit(8)
+    )
+    return {
+        "categories": [{"name": n, "slug": s, "parent": p} for n, s, p in categories],
+        "products": [{"id": i, "name": n, "market": m} for i, n, m in products],
     }
 
 

@@ -21,14 +21,24 @@ class Dataprovider {
     return request(api.get("/categories"), [], "categories");
   }
 
-  // One page of products priced on day ("YYYY-MM-DD", the market's last scrape day if omitted), optionally
-  // of one market and one category slug: { items, total, page, page_size }
-  /** @param {{ market?: string, category?: string, page?: number, pageSize?: number, day?: string }} [options] */
-  getProducts({ market, category, page = 1, pageSize = 30, day } = {}) {
+  // One page of products priced on day ("YYYY-MM-DD", the market's last scrape day if omitted),
+  // optionally of one market and one category slug, and whose names contain every word
+  // of q: { items, total, page, page_size }
+  /** @param {{ market?: string, category?: string, q?: string, page?: number, pageSize?: number, day?: string }} [options] */
+  getProducts({ market, category, q, page = 1, pageSize = 30, day } = {}) {
     return request(
-      api.get("/products", { params: { market, category, page, page_size: pageSize, day } }),
+      api.get("/products", { params: { market, category, q, page, page_size: pageSize, day } }),
       { items: [], total: 0, page, page_size: pageSize },
       `products of ${market ?? "all markets"} in ${category ?? "all categories"}`
+    );
+  }
+
+  // Categories and products matching q (2+ letters), for the search bar
+  getSuggestions(q) {
+    return request(
+      api.get("/suggestions", { params: { q } }),
+      { categories: [], products: [] },
+      `suggestions for ${q}`
     );
   }
 

@@ -1,34 +1,27 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Suspense } from "react";
+import SearchBar from "./SearchBar";
 
+// The top bar: the logo on the left leads back to all products, and the search box
+// is centered on the page. The empty right column is as wide as the logo's, which
+// keeps the middle column in the center.
 const NavBar = () => {
-  const router = useRouter();
-
-  const handleRedirect = () => {
-    router.push("/");
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000); // Add a slight delay before reloading
-  };
-
   return (
-    <div
-      className="sticky
-  top-0
-  w-full
-  bg-slate-200
-  z-30
-  flex
-  justify-center
-  items-center
-  py-4
-  cursor-pointer" // Added cursor-pointer for better UX
-      onClick={handleRedirect}
-    >
-      <span style={{ fontWeight: "bold", fontSize: "1.5rem" }}>
+    <div className="sticky top-0 z-30 grid w-full grid-cols-[1fr_minmax(0,36rem)_1fr] items-center gap-8 bg-slate-200 px-8 py-3">
+      <Link
+        href="/"
+        className="justify-self-start whitespace-nowrap"
+        style={{ fontWeight: "bold", fontSize: "1.5rem" }}
+      >
         Market Comparer
-      </span>
+      </Link>
+      {/* SearchBar reads the URL's ?q=, which Next.js only knows in the browser */}
+      <Suspense>
+        <SearchBar />
+      </Suspense>
+      <div />
     </div>
   );
 };

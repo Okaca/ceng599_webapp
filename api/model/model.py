@@ -58,6 +58,25 @@ class ProductPage(BaseModel):
     page_size: int
 
 
+class CategorySuggestion(BaseModel):
+    name: str
+    slug: str
+    parent: Optional[str] = None  # the main category's name, for a subcategory
+
+
+class ProductSuggestion(BaseModel):
+    id: int
+    name: str
+    market: str
+
+
+class Suggestions(BaseModel):
+    """What the search bar offers while the user types"""
+
+    categories: list[CategorySuggestion]
+    products: list[ProductSuggestion]
+
+
 class CategoryNode(BaseModel):
     """A category with its subcategories, for the sidebar"""
 

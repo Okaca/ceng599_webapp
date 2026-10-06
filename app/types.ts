@@ -40,7 +40,13 @@ export interface Category {
   children: Category[];
 }
 
-// One page of a product list: GET /api/products?market=&category=&page=&page_size=
+// What the search bar offers while typing: GET /api/suggestions?q=
+export interface Suggestions {
+  categories: { name: string; slug: string; parent: string | null }[];
+  products: { id: number; name: string; market: MarketName }[];
+}
+
+// One page of a product list: GET /api/products?market=&category=&q=&page=&page_size=
 export interface ProductPage {
   items: Product[];
   total: number; // products in the whole list, across all pages
