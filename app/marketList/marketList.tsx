@@ -1,9 +1,10 @@
 import React from "react";
-import ProductCard, { ProductCardProps } from "../components/ProductCard";
+import ProductCard from "../components/ProductCard";
+import { Product } from "../types";
 
 interface MarketListProps {
   marketName: string;
-  data: ProductCardProps[];
+  data: Product[];
 }
 
 const MarketList: React.FC<MarketListProps> = ({ marketName, data }) => {
@@ -35,17 +36,7 @@ const MarketList: React.FC<MarketListProps> = ({ marketName, data }) => {
       <div>
         <div className="grid grid-cols-6 gap-8 p-8">
           {data.map((product) => (
-            <ProductCard
-              key={product.id}
-              id={product.id}
-              title={product.title}
-              scrapedDate={product.scrapedDate}
-              imageUrl={product.imageUrl}
-              itemURL={product.itemURL}
-              name={product.name}
-              price={product.price}
-              marketName={product.marketName}
-            />
+            <ProductCard key={product.id} product={product} />
           ))}
         </div>
       </div>
