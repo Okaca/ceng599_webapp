@@ -11,7 +11,8 @@ import {
 } from "@nextui-org/react";
 import { useEffect, useState } from "react";
 import Dataprovider from "../dataProvider/dataProvider";
-import { ProductCardProps } from "./ProductCard";
+import { formatPrice } from "./ProductCard";
+import { MARKET_LABELS, PricePoint, Product } from "../types";
 import {
   CartesianGrid,
   Legend,
@@ -24,70 +25,28 @@ import {
 } from "recharts";
 
 interface ProductDetailsProps {
-  product: MarketProduct;
+  product: Product;
 }
 
-interface MarketProduct {
-  productId: string;
-  title: string;
-  scrapedDate: string;
-  imageUrl: string;
-  itemURL: string;
-  name: string;
-  price: string;
-  marketName: string;
-}
-
-interface ChartData {
-  value: string;
-  date: string;
-}
+// scraped_at -> "06.10.2026"
+const formatDate = (timestamp: string) =>
+  new Date(timestamp).toLocaleDateString("tr-TR");
 
 const dp = new Dataprovider();
 
 const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
-  const [pastData, setPastData] = useState<ChartData[]>([]);
-
-  const formatAxis = (tick: any) => {
-    return `${tick} ₺`;
-  };
+  const [pastData, setPastData] = useState<PricePoint[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log(" FIND SOLUTION TO PRODUCT NAME : ", product.name);
-      try {
-        if (product.marketName == "migros") {
-          const pastProducts = await dp.getMigrosChartValuesByName(
-            product.name
-          );
-          setPastData(pastProducts);
-        } else if (product.marketName == "sok") {
-          const pastProducts = await dp.getSokChartValuesByName(product.name);
-          setPastData(pastProducts);
-        } else if (product.marketName == "getir") {
-          const pastProducts = await dp.getGetirChartValuesByName(product.name);
-          setPastData(pastProducts);
-        } else if (product.marketName == "carefour") {
-          const pastProducts = await dp.getCarefourChartValuesByName(
-            product.name
-          );
-          setPastData(pastProducts);
-        } else if (product.marketName == "a101") {
-          const pastProducts = await dp.getA101ChartValuesByName(product.name);
-          setPastData(pastProducts);
-        } else {
-          setPastData([]);
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
+      setPastData(await dp.getPriceHistory(product.id));
     };
 
     fetchData();
-  }, []);
+  }, [product.id]);
 
-  // Calculate the maximum value in your data
-  const maxValue = Math.max(...pastData.map((d) => parseFloat(d.value)));
+  const isDiscounted =
+    product.regular_price !== null && product.regular_price > product.price;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -96,7 +55,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
           <CardHeader className="flex justify-center gap-3">
             <Image
               className="object-cover rounded-xl"
-              src={product.imageUrl}
+              src={product.image_url ?? undefined}
               width="auto"
               alt={product.name}
             />
@@ -104,14 +63,33 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
           <Divider />
           <CardBody>
             <span style={{ fontWeight: "bold" }}>{product.name}</span>
-            <span>{product.price}₺</span>
+            <span>{MARKET_LABELS[product.market]}</span>
+            <span>
+              {formatPrice(product.price)}
+              {isDiscounted && (
+                <>
+                  {" "}
+                  <s className="text-default-400">
+                    {formatPrice(product.regular_price!)}
+                  </s>
+                  {product.discount_rate !== null && (
+                    <span className="text-danger"> %{product.discount_rate}</span>
+                  )}
+                </>
+              )}
+            </span>
+            {!product.in_stock && <span className="text-danger">Stokta yok</span>}
           </CardBody>
-          <Divider />
-          <CardFooter className="flex justify-center">
-            <Link isExternal href={product.itemURL}>
-              Ürünü sitesinde görüntüle
-            </Link>
-          </CardFooter>
+          {product.url && (
+            <>
+              <Divider />
+              <CardFooter className="flex justify-center">
+                <Link isExternal href={product.url}>
+                  Ürünü sitesinde görüntüle
+                </Link>
+              </CardFooter>
+            </>
+          )}
         </Card>
       </div>
 
@@ -122,14 +100,17 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
             margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
           >
             <CartesianGrid stroke="hsl(var(--muted))" />
-            <XAxis dataKey="date" />
-            <YAxis tickFormatter={formatAxis} domain={[0, maxValue + 10]} />
-            <Tooltip formatter={formatAxis} />
+            <XAxis dataKey="scraped_at" tickFormatter={formatDate} />
+            <YAxis tickFormatter={formatPrice} domain={[0, "auto"]} />
+            <Tooltip
+              labelFormatter={formatDate}
+              formatter={(value: number) => formatPrice(value)}
+            />
             <Legend />
             <Line
               type="monotone"
-              name="price"
-              dataKey="value"
+              name="Fiyat"
+              dataKey="price"
               stroke="#000000"
               dot={{ fill: "#000000", stroke: "#000000", strokeWidth: 2 }} // Black dots
               activeDot={{ r: 8, stroke: "#000000", strokeWidth: 2 }} // Black active dots
