@@ -4,8 +4,6 @@ import axios from "axios";
 // works on any host without CORS
 const api = axios.create({ baseURL: "/api" });
 
-export const MARKETS = ["a101", "carrefour", "getir", "migros", "sok"];
-
 // Requests resolve to `fallback` on failure, so a page still renders with empty data
 async function request(promise, fallback, what) {
   try {

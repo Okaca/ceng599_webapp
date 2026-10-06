@@ -2,6 +2,17 @@
 
 export type MarketName = "a101" | "carrefour" | "getir" | "migros" | "sok";
 
+export const MARKETS: MarketName[] = ["migros", "a101", "getir", "carrefour", "sok"];
+
+// How each market's name is shown in the UI
+export const MARKET_LABELS: Record<MarketName, string> = {
+  a101: "A101",
+  carrefour: "Carrefour",
+  getir: "Getir",
+  migros: "Migros",
+  sok: "ŞOK",
+};
+
 // A product with its price on one day: GET /api/{market}, /api/product/{id}, POST /api/filter
 export interface Product {
   id: number;
