@@ -1,11 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from sqlalchemy import DateTime, ForeignKey, Numeric, SmallInteger
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, SmallInteger, Table, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-# The tables are created and written by the marketScraper (db/init.sql). These
-# classes only map them for reading: never call Base.metadata.create_all().
+# The tables are created by the marketScraper's db/init.sql. These classes only
+# map them for reading: never call Base.metadata.create_all().
 
 
 class Base(DeclarativeBase):
@@ -55,3 +55,26 @@ class Price(Base):
     scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     product: Mapped[Product] = relationship(back_populates="prices")
+
+
+class Category(Base):
+    """Our own category tree: main > sub, the same for every market"""
+
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"))
+    name: Mapped[str]
+    slug: Mapped[str] = mapped_column(unique=True)  # the path, e.g. 'sut-kahvaltilik/peynir'
+    position: Mapped[int]  # display order among siblings
+
+
+# A view: every (market, market category) pair in products, with the category of
+# our tree it resolves to. Market categories no rule covers are absent.
+category_resolution = Table(
+    "category_resolution",
+    Base.metadata,
+    Column("market_id", Integer),
+    Column("category", Text),
+    Column("category_id", Integer),
+)

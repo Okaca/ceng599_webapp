@@ -6,12 +6,13 @@ import { DEFAULT_PAGE_SIZE, MARKET_LABELS, MarketName, ProductPage } from "../ty
 
 interface MarketListProps {
   market: MarketName;
+  category?: string; // a category slug; all categories when omitted
 }
 
 const dp = new Dataprovider();
 
-// One market's products, fetched from the API one page at a time
-const MarketList: React.FC<MarketListProps> = ({ market }) => {
+// One market's products, optionally of one category, fetched from the API one page at a time
+const MarketList: React.FC<MarketListProps> = ({ market, category }) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<ProductPage | null>(null);
@@ -20,18 +21,21 @@ const MarketList: React.FC<MarketListProps> = ({ market }) => {
     // A response that arrives after the user moved to another page is dropped,
     // so a slow earlier request can't overwrite the page they're looking at
     let current = true;
-    dp.getMarket(market, page, pageSize).then((result: ProductPage) => {
+    dp.getProducts({ market, category, page, pageSize }).then((result: ProductPage) => {
       if (current) setData(result);
     });
     return () => {
       current = false;
     };
-  }, [market, page, pageSize]);
+  }, [market, category, page, pageSize]);
 
   const changePageSize = (size: number) => {
     setPageSize(size);
     setPage(1);
   };
+
+  // A market with nothing in the chosen category is left out of the comparison
+  if (category && data?.total === 0) return null;
 
   return (
     <div style={{ marginBottom: "20px" }}>

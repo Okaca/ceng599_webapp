@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session, contains_eager
 from api.config.config import get_session
 from api.entity import entities as db
-from api.model.model import KeywordJsonModel, Price, ProductPage, ProductWithPrice
+from api.model.model import CategoryNode, Price, ProductPage, ProductWithPrice
 from api.serializer.serializer import convertPrices, convertProduct, convertProducts
 
 marketApi = APIRouter(prefix="/api")
@@ -16,14 +16,22 @@ Market = Literal["a101", "carrefour", "getir", "migros", "sok"]
 # Turkey has been on UTC+3 all year since 2016; the scraper buckets prices by Istanbul day
 ISTANBUL = timezone(timedelta(hours=3))
 
-# Extra names a search keyword should also match
-SYNONYMS = {"Salatalık": ["hıyar"]}
+
+def latest_day(session: Session, market: Optional[str]) -> date:
+    """The last (Istanbul) day the market, or any market, was scraped; today if never.
+    Lists default to it, so they aren't empty before the 06:00 scrape or after a
+    market's scrape failed."""
+    query = select(func.max(db.Price.scraped_at))
+    if market:
+        query = query.join(db.Price.product).join(db.Product.market).where(db.Market.name == market)
+    latest = session.scalar(query)
+    return latest.astimezone(ISTANBUL).date() if latest else datetime.now(ISTANBUL).date()
 
 
-def products_on(day: Optional[date]) -> Select:
-    """Products with their price on day (default today), one price per product:
-    the cheapest when several stores were scraped that day"""
-    start = datetime.combine(day or datetime.now(ISTANBUL).date(), time(), ISTANBUL)
+def products_on(day: date) -> Select:
+    """Products with their price on day, one price per product: the cheapest when
+    several stores were scraped that day"""
+    start = datetime.combine(day, time(), ISTANBUL)
     return (
         select(db.Product, db.Price)
         .join(db.Product.market)
@@ -35,23 +43,69 @@ def products_on(day: Optional[date]) -> Select:
     )
 
 
+def in_category(query: Select, slug: str) -> Select:
+    """Keeps the products of the category with this slug and of every category below it"""
+    resolution = db.category_resolution
+    return (
+        query.join(
+            resolution,
+            (resolution.c.market_id == db.Product.market_id)
+            & (resolution.c.category == db.Product.category),
+        )
+        .join(db.Category, db.Category.id == resolution.c.category_id)
+        .where(
+            or_(
+                db.Category.slug == slug,
+                db.Category.slug.startswith(slug + "/", autoescape=True),
+            )
+        )
+    )
+
+
 @marketApi.get("/")
 def healt_check():
     return {"message": "API is up and running!"}
 
 
-@marketApi.post("/filter", response_model=list[ProductWithPrice])
-def filter_all_market_by_item(
-    keywordJson: KeywordJsonModel,
+@marketApi.get("/categories", response_model=list[CategoryNode])
+def get_categories(session: Session = Depends(get_session)):
+    """The whole category tree, main categories first, each with its children"""
+    categories = session.scalars(select(db.Category).order_by(db.Category.position))
+    nodes = {}
+    roots = []
+    # position orders parents before their children, so a parent's node always exists
+    for category in categories:
+        node = {"name": category.name, "slug": category.slug, "children": []}
+        nodes[category.id] = node
+        siblings = nodes[category.parent_id]["children"] if category.parent_id else roots
+        siblings.append(node)
+    return roots
+
+
+@marketApi.get("/products", response_model=ProductPage)
+def get_products(
+    market: Optional[Market] = None,
+    category: Optional[str] = Query(None, description="A category slug, e.g. sut-kahvaltilik/peynir"),
     day: Optional[date] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
     session: Session = Depends(get_session),
 ):
-    names = [keywordJson.main] + SYNONYMS.get(keywordJson.main, [])
-    query = products_on(day).where(
-        or_(*[db.Product.name.icontains(name, autoescape=True) for name in names]),
-        db.Product.name.icontains(keywordJson.sub or "", autoescape=True),
-    )
-    return convertProducts(session.execute(query))
+    """One page of products priced on day (default: the market's last scrape day),
+    optionally of one market and one category"""
+    query = products_on(day or latest_day(session, market))
+    if market:
+        query = query.where(db.Market.name == market)
+    if category:
+        query = in_category(query, category)
+    total = session.scalar(select(func.count()).select_from(query.subquery()))
+    rows = session.execute(query.limit(page_size).offset((page - 1) * page_size))
+    return {
+        "items": convertProducts(rows),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @marketApi.get("/product/{product_id}", response_model=ProductWithPrice)
@@ -75,22 +129,3 @@ def get_product_prices(product_id: int, session: Session = Depends(get_session))
         select(db.Price).where(db.Price.product_id == product_id).order_by(db.Price.scraped_at)
     )
     return convertPrices(prices)
-
-
-@marketApi.get("/{market}", response_model=ProductPage)
-def get_market_products(
-    market: Market,
-    day: Optional[date] = None,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(30, ge=1, le=100),
-    session: Session = Depends(get_session),
-):
-    query = products_on(day).where(db.Market.name == market)
-    total = session.scalar(select(func.count()).select_from(query.subquery()))
-    rows = session.execute(query.limit(page_size).offset((page - 1) * page_size))
-    return {
-        "items": convertProducts(rows),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    }

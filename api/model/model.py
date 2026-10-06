@@ -58,10 +58,9 @@ class ProductPage(BaseModel):
     page_size: int
 
 
-class KeywordModel(BaseModel):
-    keyword: str
+class CategoryNode(BaseModel):
+    """A category with its subcategories, for the sidebar"""
 
-
-class KeywordJsonModel(BaseModel):
-    main: str
-    sub: Optional[str] = ""
+    name: str
+    slug: str  # the path, e.g. 'sut-kahvaltilik/peynir'
+    children: list["CategoryNode"] = []

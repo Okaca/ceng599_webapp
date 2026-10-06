@@ -13,7 +13,7 @@ export const MARKET_LABELS: Record<MarketName, string> = {
   sok: "ŞOK",
 };
 
-// A product with its price on one day: GET /api/{market}, /api/product/{id}, POST /api/filter
+// A product with its price on one day: GET /api/products, /api/product/{id}
 export interface Product {
   id: number;
   market: MarketName;
@@ -33,7 +33,14 @@ export interface Product {
   scraped_at: string; // ISO timestamp, e.g. "2026-10-06T11:37:00Z"
 }
 
-// One page of a product list: GET /api/{market}?page=&page_size=
+// A node of the category tree: GET /api/categories
+export interface Category {
+  name: string;
+  slug: string; // the path, e.g. "sut-kahvaltilik/peynir"
+  children: Category[];
+}
+
+// One page of a product list: GET /api/products?market=&category=&page=&page_size=
 export interface ProductPage {
   items: Product[];
   total: number; // products in the whole list, across all pages

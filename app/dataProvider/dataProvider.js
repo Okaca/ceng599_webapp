@@ -16,13 +16,19 @@ async function request(promise, fallback, what) {
 }
 
 class Dataprovider {
-  // One page of a market's products with their price on day ("YYYY-MM-DD"), today
-  // if omitted: { items, total, page, page_size }
-  getMarket(market, page = 1, pageSize = 30, day) {
+  // The category tree: [{ name, slug, children: [...] }, ...]
+  getCategories() {
+    return request(api.get("/categories"), [], "categories");
+  }
+
+  // One page of products priced on day ("YYYY-MM-DD", the market's last scrape day if omitted), optionally
+  // of one market and one category slug: { items, total, page, page_size }
+  /** @param {{ market?: string, category?: string, page?: number, pageSize?: number, day?: string }} [options] */
+  getProducts({ market, category, page = 1, pageSize = 30, day } = {}) {
     return request(
-      api.get(`/${market}`, { params: { page, page_size: pageSize, day } }),
+      api.get("/products", { params: { market, category, page, page_size: pageSize, day } }),
       { items: [], total: 0, page, page_size: pageSize },
-      market
+      `products of ${market ?? "all markets"} in ${category ?? "all categories"}`
     );
   }
 
@@ -34,15 +40,6 @@ class Dataprovider {
   // Every price of one product, oldest first, for the chart
   getPriceHistory(id) {
     return request(api.get(`/product/${id}/prices`), [], `prices of product ${id}`);
-  }
-
-  // Products in all markets whose name contains keywordJson.main and keywordJson.sub
-  getMarketItemByKeyword(keywordJson, day) {
-    return request(
-      api.post("/filter", { main: keywordJson.main, sub: keywordJson.sub }, { params: { day } }),
-      [],
-      `products matching ${keywordJson.main}`
-    );
   }
 }
 
