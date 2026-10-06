@@ -1,10 +1,5 @@
 from fastapi import FastAPI
 from api.routes.routes import marketApi
-from api.routes.migrosApi import migrosApi
-from api.routes.sokApi import sokApi
-from api.routes.getirApi import getirApi
-from api.routes.a101Api import a101Api
-from api.routes.carefourApi import carefourApi
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -23,8 +18,3 @@ app.add_middleware(
 )
 
 app.include_router(marketApi)
-app.include_router(migrosApi)
-app.include_router(sokApi)
-app.include_router(getirApi)
-app.include_router(a101Api)
-app.include_router(carefourApi)
