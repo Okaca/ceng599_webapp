@@ -16,9 +16,14 @@ async function request(promise, fallback, what) {
 }
 
 class Dataprovider {
-  // Products of one market with their price on day ("YYYY-MM-DD"), today if omitted
-  getMarket(market, day) {
-    return request(api.get(`/${market}`, { params: { day } }), [], market);
+  // One page of a market's products with their price on day ("YYYY-MM-DD"), today
+  // if omitted: { items, total, page, page_size }
+  getMarket(market, page = 1, pageSize = 30, day) {
+    return request(
+      api.get(`/${market}`, { params: { page, page_size: pageSize, day } }),
+      { items: [], total: 0, page, page_size: pageSize },
+      market
+    );
   }
 
   // One product with its latest price

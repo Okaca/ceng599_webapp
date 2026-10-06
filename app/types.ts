@@ -33,6 +33,17 @@ export interface Product {
   scraped_at: string; // ISO timestamp, e.g. "2026-10-06T11:37:00Z"
 }
 
+// One page of a product list: GET /api/{market}?page=&page_size=
+export interface ProductPage {
+  items: Product[];
+  total: number; // products in the whole list, across all pages
+  page: number;
+  page_size: number;
+}
+
+export const PAGE_SIZES = [10, 20, 30, 50, 100];
+export const DEFAULT_PAGE_SIZE = 30;
+
 // One price of a product's history: GET /api/product/{id}/prices
 export interface PricePoint {
   price: number;

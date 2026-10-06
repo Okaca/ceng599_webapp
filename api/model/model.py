@@ -49,6 +49,15 @@ class ProductWithPrice(Product):
     scraped_at: datetime
 
 
+class ProductPage(BaseModel):
+    """One page of a product list, with the size of the whole list"""
+
+    items: list[ProductWithPrice]
+    total: int
+    page: int
+    page_size: int
+
+
 class KeywordModel(BaseModel):
     keyword: str
 

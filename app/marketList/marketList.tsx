@@ -1,13 +1,38 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ProductCard from "../components/ProductCard";
-import { Product } from "../types";
+import Pager from "../components/Pager";
+import Dataprovider from "../dataProvider/dataProvider";
+import { DEFAULT_PAGE_SIZE, MARKET_LABELS, MarketName, ProductPage } from "../types";
 
 interface MarketListProps {
-  marketName: string;
-  data: Product[];
+  market: MarketName;
 }
 
-const MarketList: React.FC<MarketListProps> = ({ marketName, data }) => {
+const dp = new Dataprovider();
+
+// One market's products, fetched from the API one page at a time
+const MarketList: React.FC<MarketListProps> = ({ market }) => {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [data, setData] = useState<ProductPage | null>(null);
+
+  useEffect(() => {
+    // A response that arrives after the user moved to another page is dropped,
+    // so a slow earlier request can't overwrite the page they're looking at
+    let current = true;
+    dp.getMarket(market, page, pageSize).then((result: ProductPage) => {
+      if (current) setData(result);
+    });
+    return () => {
+      current = false;
+    };
+  }, [market, page, pageSize]);
+
+  const changePageSize = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+  };
+
   return (
     <div style={{ marginBottom: "20px" }}>
       <div
@@ -30,16 +55,27 @@ const MarketList: React.FC<MarketListProps> = ({ marketName, data }) => {
             fontSize: "25px",
           }}
         >
-          {marketName}
+          {MARKET_LABELS[market]}
         </h1>
       </div>
-      <div>
-        <div className="grid grid-cols-6 gap-8 p-8">
-          {data.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+      {data ? (
+        <div>
+          <div className="grid grid-cols-6 gap-8 p-8">
+            {data.items.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+          <Pager
+            page={page}
+            pageSize={pageSize}
+            total={data.total}
+            onPageChange={setPage}
+            onPageSizeChange={changePageSize}
+          />
         </div>
-      </div>
+      ) : (
+        <p className="text-center">Loading...</p>
+      )}
     </div>
   );
 };

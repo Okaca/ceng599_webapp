@@ -1,12 +1,12 @@
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal, Optional
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import Select, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session, contains_eager
 from api.config.config import get_session
 from api.entity import entities as db
-from api.model.model import KeywordJsonModel, Price, ProductWithPrice
+from api.model.model import KeywordJsonModel, Price, ProductPage, ProductWithPrice
 from api.serializer.serializer import convertPrices, convertProduct, convertProducts
 
 marketApi = APIRouter(prefix="/api")
@@ -77,9 +77,20 @@ def get_product_prices(product_id: int, session: Session = Depends(get_session))
     return convertPrices(prices)
 
 
-@marketApi.get("/{market}", response_model=list[ProductWithPrice])
+@marketApi.get("/{market}", response_model=ProductPage)
 def get_market_products(
-    market: Market, day: Optional[date] = None, session: Session = Depends(get_session)
+    market: Market,
+    day: Optional[date] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    session: Session = Depends(get_session),
 ):
     query = products_on(day).where(db.Market.name == market)
-    return convertProducts(session.execute(query))
+    total = session.scalar(select(func.count()).select_from(query.subquery()))
+    rows = session.execute(query.limit(page_size).offset((page - 1) * page_size))
+    return {
+        "items": convertProducts(rows),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }

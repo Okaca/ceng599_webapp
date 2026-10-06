@@ -1,29 +1,17 @@
 "use client";
 import Dataprovider from "./dataProvider/dataProvider";
 import MarketList from "./marketList/marketList";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import SideBar from "./components/SideBar";
 import CompareList from "./marketList/CompareList";
-import { MARKETS, MARKET_LABELS, MarketName, Product } from "./types";
+import { MARKETS, Product } from "./types";
 
 const dp = new Dataprovider();
 
 export default function Home() {
-  // Each market's products, filled in as its request finishes
-  const [marketData, setMarketData] = useState<Partial<Record<MarketName, Product[]>>>({});
   const [marketItemsData, setMarketItemsData] = useState<Product[]>([]);
   const [keywordSelected, setKeywordSelected] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-
-  useEffect(() => {
-    // All five requests start at once, without awaiting one another; each market
-    // is shown as soon as its own response arrives. The API defaults to today's
-    // Istanbul date, the day the scraper files prices under.
-    MARKETS.forEach(async (market) => {
-      const products: Product[] = await dp.getMarket(market);
-      setMarketData((loaded) => ({ ...loaded, [market]: products }));
-    });
-  }, []);
 
   const handleKeywordSelect = async (selectedKeyword: {
     main: string;
@@ -52,15 +40,14 @@ export default function Home() {
               <CompareList data={marketItemsData} />
             )
           ) : (
+            // Every MarketList fetches its own first page as soon as it mounts, so
+            // all five requests run at the same time and each market appears as
+            // soon as its own response arrives. The API defaults to today's
+            // Istanbul date, the day the scraper files prices under.
             <div>
-              {MARKETS.map((market) => {
-                const products = marketData[market];
-                return products ? (
-                  <MarketList key={market} marketName={MARKET_LABELS[market]} data={products} />
-                ) : (
-                  <p key={market}>Loading {MARKET_LABELS[market]}...</p>
-                );
-              })}
+              {MARKETS.map((market) => (
+                <MarketList key={market} market={market} />
+              ))}
             </div>
           )}
         </div>
