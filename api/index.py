@@ -3,7 +3,36 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from api.routes.routes import marketApi
 
+# The path the site lives under behind a proxy, e.g. /marketScraper for
+# onurkagancoskun.com/marketScraper; empty when it is the root of a domain.
+BASE_PATH = os.getenv("BASE_PATH", "").rstrip("/")
+
+
+class StripBasePath:
+    """Serves /marketScraper/api/... as /api/..., so the app works whether the proxy in
+    front passes the base path on or removes it. root_path keeps the prefix in URLs the
+    app builds itself, such as redirects."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if BASE_PATH and scope["type"] in ("http", "websocket") and (
+            path == BASE_PATH or path.startswith(BASE_PATH + "/")
+        ):
+            stripped = path[len(BASE_PATH):] or "/"
+            scope = {
+                **scope,
+                "path": stripped,
+                "raw_path": stripped.encode(),
+                "root_path": scope.get("root_path", "") + BASE_PATH,
+            }
+        await self.app(scope, receive, send)
+
+
 app = FastAPI()
+app.add_middleware(StripBasePath)
 
 app.include_router(marketApi)
 

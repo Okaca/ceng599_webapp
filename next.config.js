@@ -19,6 +19,10 @@ const nextConfig = isDev
       // /product/ instead of /product.html, so the file server finds every page as
       // <folder>/index.html
       trailingSlash: true,
+      // The path the site lives under, e.g. /marketScraper for
+      // onurkagancoskun.com/marketScraper; empty for the root of a domain. Pages, links
+      // and assets get it in front; the Dockerfile sets it.
+      basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
     };
 
 module.exports = nextConfig;

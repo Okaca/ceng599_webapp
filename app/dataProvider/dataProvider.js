@@ -1,8 +1,10 @@
 import axios from "axios";
 
-// Relative URL: next.config.js rewrites /api/* to the FastAPI server, so this
-// works on any host without CORS
-const api = axios.create({ baseURL: "/api" });
+// Relative URL, so it works on any host without CORS: in production the same server
+// serves the pages and /api, in development next.config.js forwards /api to FastAPI.
+// NEXT_PUBLIC_BASE_PATH is the path the site lives under (e.g. /marketScraper), fixed
+// at build time; Next.js adds it to links by itself, but not to requests made here.
+const api = axios.create({ baseURL: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api` });
 
 // Requests resolve to `fallback` on failure, so a page still renders with empty data
 async function request(promise, fallback, what) {
