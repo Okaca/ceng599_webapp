@@ -1,0 +1,27 @@
+# Only this part will be undr services in docker-compose.yml file in pi in addition to the scraper and postgres
+
+services:
+  webapp:
+    # FastAPI serving /api from the database and the frontend at every other path
+    image: metu1onurc1/market-webapp:latest
+    container_name: market_webapp
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    ports:
+      # 3000 and 3001 are taken on the Pi; open http://<pi-address>:3002
+      - "3002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  # the database files; survives container updates, deleted only by "docker compose down -v"
+  pgdata:
