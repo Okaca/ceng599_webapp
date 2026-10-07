@@ -78,7 +78,7 @@ const SearchBar = () => {
       key: `product-${product.id}`,
       label: product.name,
       detail: MARKET_LABELS[product.market],
-      href: `/product/${product.id}`,
+      href: `/product/?id=${product.id}`,
     });
   }
 

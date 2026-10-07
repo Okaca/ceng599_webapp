@@ -17,7 +17,7 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
     <Card
       className="py-4"
       isPressable
-      onPress={() => router.push(`/product/${product.id}`)}
+      onPress={() => router.push(`/product/?id=${product.id}`)}
     >
       <CardHeader className="pb-0 pt-2 px-4 flex-col items-start">
         <p className="text-tiny uppercase font-bold text-large">{product.name}</p>

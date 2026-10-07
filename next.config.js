@@ -1,18 +1,24 @@
 /** @type {import('next').NextConfig} */
 
-// Where the FastAPI server is: localhost in development, the API container's
-// address in Docker (e.g. API_URL=http://api:8000). Rewrites are fixed when
-// `next build` runs, so API_URL must be set at build time.
+// In production the frontend is plain files: `next build` exports it to out/, and the
+// FastAPI server serves those files next to /api (api/index.py), so one server runs both.
+// In development `next dev` serves the pages and forwards /api to the FastAPI dev server.
+const isDev = process.env.NODE_ENV === "development";
 const API_URL = process.env.API_URL || "http://127.0.0.1:8000";
 
-const nextConfig = {
-  rewrites: async () => {
-    return [
-      { source: "/api/:path*", destination: `${API_URL}/api/:path*` },
-      { source: "/docs", destination: `${API_URL}/docs` },
-      { source: "/openapi.json", destination: `${API_URL}/openapi.json` },
-    ];
-  },
-};
+const nextConfig = isDev
+  ? {
+      rewrites: async () => [
+        { source: "/api/:path*", destination: `${API_URL}/api/:path*` },
+        { source: "/docs", destination: `${API_URL}/docs` },
+        { source: "/openapi.json", destination: `${API_URL}/openapi.json` },
+      ],
+    }
+  : {
+      output: "export",
+      // /product/ instead of /product.html, so the file server finds every page as
+      // <folder>/index.html
+      trailingSlash: true,
+    };
 
 module.exports = nextConfig;
