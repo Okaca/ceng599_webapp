@@ -25,11 +25,12 @@ class Dataprovider {
 
   // One page of products priced on day ("YYYY-MM-DD", the market's last scrape day if omitted),
   // optionally of one market and one category slug, and whose names contain every word
-  // of q: { items, total, page, page_size }
-  /** @param {{ market?: string, category?: string, q?: string, page?: number, pageSize?: number, day?: string }} [options] */
-  getProducts({ market, category, q, page = 1, pageSize = 30, day } = {}) {
+  // of q, ordered by sort ("unit_price" or "price"; product id if omitted):
+  // { items, total, page, page_size }
+  /** @param {{ market?: string, category?: string, q?: string, sort?: string, page?: number, pageSize?: number, day?: string }} [options] */
+  getProducts({ market, category, q, sort, page = 1, pageSize = 30, day } = {}) {
     return request(
-      api.get("/products", { params: { market, category, q, page, page_size: pageSize, day } }),
+      api.get("/products", { params: { market, category, q, sort, page, page_size: pageSize, day } }),
       { items: [], total: 0, page, page_size: pageSize },
       `products of ${market ?? "all markets"} in ${category ?? "all categories"}`
     );

@@ -31,7 +31,14 @@ export interface Product {
   discount_rate: number | null; // e.g. 33 for %33
   in_stock: boolean;
   scraped_at: string; // ISO timestamp, e.g. "2026-10-06T11:37:00Z"
+  unit_price: number | null; // price per kg, L or piece; null without a size
+  price_unit: PriceUnit | null;
 }
+
+export type PriceUnit = "kg" | "l" | "adet";
+
+// How products are ordered: per kg/L/piece (grouped by unit) or by shelf price
+export type Sort = "unit_price" | "price";
 
 // A node of the category tree: GET /api/categories
 export interface Category {

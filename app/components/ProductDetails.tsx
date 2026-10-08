@@ -11,7 +11,7 @@ import {
 } from "@nextui-org/react";
 import { useEffect, useState } from "react";
 import Dataprovider from "../dataProvider/dataProvider";
-import { formatPrice } from "./ProductCard";
+import { formatPrice, formatSize, formatUnitPrice } from "./ProductCard";
 import { MARKET_LABELS, PricePoint, Product } from "../types";
 import {
   CartesianGrid,
@@ -64,6 +64,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
           <CardBody>
             <span style={{ fontWeight: "bold" }}>{product.name}</span>
             <span>{MARKET_LABELS[product.market]}</span>
+            {formatSize(product) && <span className="text-default-500">{formatSize(product)}</span>}
             <span>
               {formatPrice(product.price)}
               {isDiscounted && (
@@ -78,6 +79,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
                 </>
               )}
             </span>
+            {formatUnitPrice(product) && (
+              <span className="text-default-500">{formatUnitPrice(product)}</span>
+            )}
             {!product.in_stock && <span className="text-danger">Stokta yok</span>}
           </CardBody>
           {product.url && (
