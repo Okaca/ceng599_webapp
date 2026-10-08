@@ -1,11 +1,18 @@
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Date, Select, and_, case, func, or_, select
+from sqlalchemy import Date, Select, and_, case, false, func, or_, select
 from sqlalchemy.orm import Session, aliased, contains_eager
 from api.config.config import get_session
 from api.entity import entities as db
-from api.model.model import CategoryNode, Price, ProductPage, ProductWithPrice, Suggestions
+from api.model.model import (
+    CategoryNode,
+    GroupPage,
+    Price,
+    ProductPage,
+    ProductWithPrice,
+    Suggestions,
+)
 from api.serializer.serializer import convertPrices, convertProduct, convertProducts
 
 marketApi = APIRouter(prefix="/api")
@@ -26,6 +33,17 @@ def latest_day(session: Session, market: Optional[str]) -> date:
         query = query.join(db.Price.product).join(db.Product.market).where(db.Market.name == market)
     latest = session.scalar(query)
     return latest.astimezone(ISTANBUL).date() if latest else datetime.now(ISTANBUL).date()
+
+
+def latest_days(session: Session) -> dict[int, date]:
+    """Each market's last scrape day of the past two weeks, by market id"""
+    rows = session.execute(
+        select(db.Product.market_id, func.max(db.Price.scraped_at))
+        .join(db.Price.product)
+        .where(db.Price.scraped_at >= datetime.now(ISTANBUL) - timedelta(days=14))
+        .group_by(db.Product.market_id)
+    )
+    return {market_id: latest.astimezone(ISTANBUL).date() for market_id, latest in rows}
 
 
 # The scraper stores sizes in g, ml or adet (kg and L are converted). A unit price is
@@ -95,13 +113,79 @@ def products_on(day: date) -> Select:
     )
 
 
-def matches(column, q: str):
-    """True when every word of q appears in the column, ignoring case and Turkish letters.
-    Both sides go through search_fold() (marketScraper/db/init.sql), which the trigram
-    index on product names is built on."""
+def priced_offers(columns, days: dict[int, date]) -> Select:
+    """Every product with its price on its market's last scrape day, one price per
+    product, and its group. Selects the given columns."""
+    on_latest_day = or_(
+        *[(db.Product.market_id == market_id) & between_days(day) for market_id, day in days.items()]
+    )
+    return (
+        select(*columns)
+        .select_from(db.Product)
+        .join(db.Product.market)
+        .join(db.Product.prices)
+        .join(db.product_groups, db.product_groups.c.product_id == db.Product.id)
+        .where(on_latest_day if days else false(), cheapest_of_its_day())
+    )
+
+
+def offers_of(session: Session, days: dict[int, date], condition) -> dict[str, list[dict]]:
+    """The offers of the groups the condition selects, by group key: one per market,
+    in stock before out of stock, cheapest first"""
+    rows = session.execute(
+        priced_offers([db.Product, db.Price, UNIT_PRICE, PRICE_UNIT, db.product_groups.c.group_key], days)
+        .options(contains_eager(db.Product.market))
+        .where(condition)
+        .order_by(db.Price.in_stock.desc(), db.Price.price, db.Product.id)
+    )
+    groups: dict[str, list[dict]] = {}
+    for product, price, unit_price, price_unit, key in rows:
+        offers = groups.setdefault(key, [])
+        # a market can list the same product twice; its cheapest one stands for it
+        if all(offer["market"] != product.market.name for offer in offers):
+            offers.append(convertProduct(product, price, unit_price, price_unit))
+    return groups
+
+
+def group_of(key: str, offers: list[dict]) -> dict:
+    cheapest = offers[0]
+    image = cheapest["image_url"] or next((o["image_url"] for o in offers if o["image_url"]), None)
+    return {
+        "key": key,
+        "name": cheapest["name"],
+        "image_url": image,
+        "quantity": cheapest["quantity"],
+        "unit": cheapest["unit"],
+        "price_unit": cheapest["price_unit"],
+        "offers": offers,
+    }
+
+
+def search_terms(session: Session, q: str) -> list[list[str]]:
+    """The words of q, folded like search_fold(), each with the words that mean the same
+    (synonyms table): "hıyar" -> ["hiyar", "salatalik"]. At most five words."""
     words = q.split()[:5]
-    patterns = ["%" + w.replace("/", "//").replace("%", "/%").replace("_", "/_") + "%" for w in words]
-    return and_(*[func.search_fold(column).like(func.search_fold(p), escape="/") for p in patterns])
+    if not words:
+        return []
+    folded = session.execute(select(*[func.search_fold(word) for word in words])).one()
+    pairs = session.execute(select(db.synonyms.c.word, db.synonyms.c.canonical)).all()
+    terms = []
+    for word in folded:
+        canonical = next((c for w, c in pairs if w == word), word)
+        same = {word, canonical} | {w for w, c in pairs if c == canonical}
+        terms.append(sorted(same))
+    return terms
+
+
+def matches(column, terms: list[list[str]]):
+    """True when the column contains every term (one of its alternatives), ignoring case and
+    Turkish letters. search_fold() is what the trigram index on product names is built on."""
+    def pattern(word: str) -> str:
+        return "%" + word.replace("/", "//").replace("%", "/%").replace("_", "/_") + "%"
+
+    return and_(
+        *[or_(*[func.search_fold(column).like(pattern(w), escape="/") for w in alternatives]) for alternatives in terms]
+    )
 
 
 def in_category(query: Select, slug: str) -> Select:
@@ -162,7 +246,7 @@ def get_products(
     if category:
         query = in_category(query, category)
     if q and q.strip():
-        query = query.where(matches(db.Product.name, q))
+        query = query.where(matches(db.Product.name, search_terms(session, q)))
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     query = query.order_by(*SORTS.get(sort, [db.Product.id]))
     rows = session.execute(query.limit(page_size).offset((page - 1) * page_size))
@@ -174,16 +258,67 @@ def get_products(
     }
 
 
+@marketApi.get("/groups", response_model=GroupPage)
+def get_groups(
+    category: Optional[str] = Query(None, description="A category slug, e.g. meyve-sebze/meyve"),
+    q: Optional[str] = Query(None, max_length=100, description="Words the product name must contain"),
+    sort: Sort = Query("unit_price", description="Cheapest per kg/L/piece, or by shelf price"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    session: Session = Depends(get_session),
+):
+    """One page of products as every market sells them: the same product of different
+    markets together, each market's price on its last scrape day, cheapest group first.
+    A group matches when any market's product in it matches the search and category."""
+    days = latest_days(session)
+    group_key = db.product_groups.c.group_key
+
+    matching = priced_offers([group_key], days)
+    if category:
+        matching = in_category(matching, category)
+    if q and q.strip():
+        matching = matching.where(matches(db.Product.name, search_terms(session, q)))
+
+    # Rank the matching groups by their cheapest offer in stock
+    offers = priced_offers(
+        [group_key, UNIT_ORDER, UNIT_PRICE, db.Price.price, db.Price.in_stock], days
+    ).subquery()
+    best_unit_price = func.min(case((offers.c.in_stock, offers.c.unit_price)))
+    best_price = func.min(case((offers.c.in_stock, offers.c.price)))
+    ranked = (
+        select(offers.c.group_key)
+        .where(offers.c.group_key.in_(matching.distinct()))
+        .group_by(offers.c.group_key)
+    )
+    if sort == "unit_price":
+        ranked = ranked.order_by(
+            func.min(offers.c.unit_order), best_unit_price.asc().nulls_last(), best_price.asc().nulls_last(), offers.c.group_key
+        )
+    else:
+        ranked = ranked.order_by(best_price.asc().nulls_last(), offers.c.group_key)
+
+    total = session.scalar(select(func.count()).select_from(ranked.subquery()))
+    keys = session.scalars(ranked.limit(page_size).offset((page - 1) * page_size)).all()
+    groups = offers_of(session, days, group_key.in_(keys)) if keys else {}
+    return {
+        "items": [group_of(key, groups[key]) for key in keys if key in groups],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
 @marketApi.get("/suggestions", response_model=Suggestions)
 def get_suggestions(
     q: str = Query(..., min_length=2, max_length=100), session: Session = Depends(get_session)
 ):
     """Categories and products whose names contain every word of q, for the search bar"""
+    terms = search_terms(session, q)
     parent = db.Category.__table__.alias("parent")
     categories = session.execute(
         select(db.Category.name, db.Category.slug, parent.c.name)
         .outerjoin(parent, parent.c.id == db.Category.parent_id)
-        .where(matches(db.Category.name, q))
+        .where(matches(db.Category.name, terms))
         .order_by(db.Category.position)
         .limit(5)
     )
@@ -194,7 +329,7 @@ def get_suggestions(
         select(db.Product.id, db.Product.name, db.Market.name)
         .join(db.Product.market)
         .where(
-            matches(db.Product.name, q),
+            matches(db.Product.name, terms),
             select(db.Price.id)
             .where(db.Price.product_id == db.Product.id, db.Price.scraped_at >= recent)
             .exists(),
@@ -221,6 +356,17 @@ def get_product(product_id: int, session: Session = Depends(get_session)):
     if row is None:
         raise HTTPException(status_code=404, detail="Product not found")
     return convertProduct(*row)
+
+
+@marketApi.get("/product/{product_id}/offers", response_model=list[ProductWithPrice])
+def get_product_offers(product_id: int, session: Session = Depends(get_session)):
+    """The same product in every market that sells it (its group), cheapest first"""
+    key = session.scalar(
+        select(db.product_groups.c.group_key).where(db.product_groups.c.product_id == product_id)
+    )
+    if key is None:
+        return []
+    return offers_of(session, latest_days(session), db.product_groups.c.group_key == key).get(key, [])
 
 
 @marketApi.get("/product/{product_id}/prices", response_model=list[Price])

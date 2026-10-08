@@ -78,3 +78,20 @@ category_resolution = Table(
     Column("category", Text),
     Column("category_id", Integer),
 )
+
+# A materialized view: every product's group. Products of different markets with the
+# same group_key (size plus the words of name and brand) are the same product.
+product_groups = Table(
+    "product_groups",
+    Base.metadata,
+    Column("product_id", Integer),
+    Column("group_key", Text),
+)
+
+# Words that mean the same thing ("hiyar" -> "salatalik"), already folded like search_fold()
+synonyms = Table(
+    "synonyms",
+    Base.metadata,
+    Column("word", Text),
+    Column("canonical", Text),
+)

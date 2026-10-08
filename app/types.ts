@@ -47,6 +47,25 @@ export interface Category {
   children: Category[];
 }
 
+// One product as every market sells it: GET /api/groups
+export interface ProductGroup {
+  key: string;
+  name: string; // as the cheapest market names it
+  image_url: string | null; // the cheapest market's photo, another's if it has none
+  quantity: number | null;
+  unit: string | null;
+  price_unit: PriceUnit | null;
+  offers: Product[]; // one per market, in stock and cheapest first
+}
+
+// One page of product groups: GET /api/groups?q=&category=&sort=&page=&page_size=
+export interface GroupPage {
+  items: ProductGroup[];
+  total: number; // groups in the whole list, across all pages
+  page: number;
+  page_size: number;
+}
+
 // What the search bar offers while typing: GET /api/suggestions?q=
 export interface Suggestions {
   categories: { name: string; slug: string; parent: string | null }[];

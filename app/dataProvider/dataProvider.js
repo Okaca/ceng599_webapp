@@ -36,6 +36,22 @@ class Dataprovider {
     );
   }
 
+  // One page of products as every market sells them, the same product of different
+  // markets together, cheapest group first: { items, total, page, page_size }
+  /** @param {{ category?: string, q?: string, sort?: string, page?: number, pageSize?: number }} [options] */
+  getGroups({ category, q, sort, page = 1, pageSize = 30 } = {}) {
+    return request(
+      api.get("/groups", { params: { category, q, sort, page, page_size: pageSize } }),
+      { items: [], total: 0, page, page_size: pageSize },
+      `product groups for ${q ?? category ?? "everything"}`
+    );
+  }
+
+  // The same product in every market that sells it, cheapest first, for the product page
+  getProductOffers(id) {
+    return request(api.get(`/product/${id}/offers`), [], `offers of product ${id}`);
+  }
+
   // Categories and products matching q (2+ letters), for the search bar
   getSuggestions(q) {
     return request(

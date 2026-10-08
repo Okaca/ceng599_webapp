@@ -60,6 +60,27 @@ class ProductPage(BaseModel):
     page_size: int
 
 
+class ProductGroup(BaseModel):
+    """One product as every market sells it: the same name and size, a price per market"""
+
+    key: str
+    name: str  # as the cheapest market names it
+    image_url: Optional[str] = None  # the cheapest market's photo, another's if it has none
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    price_unit: Optional[Literal["kg", "l", "adet"]] = None
+    offers: list[ProductWithPrice]  # one per market, cheapest in stock first
+
+
+class GroupPage(BaseModel):
+    """One page of product groups, with the number of groups in the whole list"""
+
+    items: list[ProductGroup]
+    total: int
+    page: int
+    page_size: int
+
+
 class CategorySuggestion(BaseModel):
     name: str
     slug: str
