@@ -1,9 +1,8 @@
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Select, and_, func, or_, select
-from sqlalchemy.dialects.postgresql import distinct_on
-from sqlalchemy.orm import Session, contains_eager
+from sqlalchemy import Date, Select, and_, case, func, or_, select
+from sqlalchemy.orm import Session, aliased, contains_eager
 from api.config.config import get_session
 from api.entity import entities as db
 from api.model.model import CategoryNode, Price, ProductPage, ProductWithPrice, Suggestions
@@ -12,6 +11,7 @@ from api.serializer.serializer import convertPrices, convertProduct, convertProd
 marketApi = APIRouter(prefix="/api")
 
 Market = Literal["a101", "carrefour", "getir", "migros", "sok"]
+Sort = Literal["unit_price", "price"]
 
 # Turkey has been on UTC+3 all year since 2016; the scraper buckets prices by Istanbul day
 ISTANBUL = timezone(timedelta(hours=3))
@@ -28,18 +28,70 @@ def latest_day(session: Session, market: Optional[str]) -> date:
     return latest.astimezone(ISTANBUL).date() if latest else datetime.now(ISTANBUL).date()
 
 
+# The scraper stores sizes in g, ml or adet (kg and L are converted). A unit price is
+# per kg, per L or per piece, so different sizes of the same product compare fairly.
+# Products without a size get none.
+UNIT_PRICE = case(
+    (
+        db.Product.quantity > 0,
+        db.Price.price
+        * case((db.Product.unit.in_(["g", "ml"]), 1000), else_=1)
+        / db.Product.quantity,
+    ),
+).label("unit_price")
+PRICE_UNIT = case(
+    (db.Product.quantity.is_(None) | (db.Product.quantity <= 0), None),
+    (db.Product.unit.in_(["g", "kg"]), "kg"),
+    (db.Product.unit.in_(["ml", "l"]), "l"),
+    else_="adet",
+).label("price_unit")
+
+# Unit prices only compare within one unit, so "cheapest per unit" groups kg first,
+# then L, then pieces, then products without a size
+UNIT_ORDER = case(
+    (PRICE_UNIT == "kg", 0), (PRICE_UNIT == "l", 1), (PRICE_UNIT == "adet", 2), else_=3
+).label("unit_order")
+
+SORTS = {
+    "unit_price": [UNIT_ORDER, UNIT_PRICE, db.Price.price, db.Product.id],
+    "price": [db.Price.price, db.Product.id],
+}
+
+
+def istanbul_day(column):
+    """The Istanbul date of a timestamp, as the scraper's daily price index uses it"""
+    return func.timezone("Europe/Istanbul", column).cast(Date)
+
+
+def cheapest_of_its_day():
+    """True for the cheapest of a product's prices on that day, when several stores were
+    scraped; ties go to the first one saved"""
+    other = aliased(db.Price)
+    return ~(
+        select(other.id)
+        .where(
+            other.product_id == db.Price.product_id,
+            istanbul_day(other.scraped_at) == istanbul_day(db.Price.scraped_at),
+            (other.price < db.Price.price) | ((other.price == db.Price.price) & (other.id < db.Price.id)),
+        )
+        .exists()
+    )
+
+
+def between_days(start_day: date):
+    start = datetime.combine(start_day, time(), ISTANBUL)
+    return (db.Price.scraped_at >= start) & (db.Price.scraped_at < start + timedelta(days=1))
+
+
 def products_on(day: date) -> Select:
-    """Products with their price on day, one price per product: the cheapest when
-    several stores were scraped that day"""
-    start = datetime.combine(day, time(), ISTANBUL)
+    """Products with their price on day, one price per product. Rows are
+    (Product, Price, unit_price, price_unit)."""
     return (
-        select(db.Product, db.Price)
+        select(db.Product, db.Price, UNIT_PRICE, PRICE_UNIT)
         .join(db.Product.market)
         .join(db.Product.prices)
         .options(contains_eager(db.Product.market))
-        .where(db.Price.scraped_at >= start, db.Price.scraped_at < start + timedelta(days=1))
-        .ext(distinct_on(db.Product.id))
-        .order_by(db.Product.id, db.Price.price)
+        .where(between_days(day), cheapest_of_its_day())
     )
 
 
@@ -96,6 +148,7 @@ def get_products(
     market: Optional[Market] = None,
     category: Optional[str] = Query(None, description="A category slug, e.g. sut-kahvaltilik/peynir"),
     q: Optional[str] = Query(None, max_length=100, description="Words the product name must contain"),
+    sort: Optional[Sort] = Query(None, description="Cheapest first; product id order if omitted"),
     day: Optional[date] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
@@ -111,6 +164,7 @@ def get_products(
     if q and q.strip():
         query = query.where(matches(db.Product.name, q))
     total = session.scalar(select(func.count()).select_from(query.subquery()))
+    query = query.order_by(*SORTS.get(sort, [db.Product.id]))
     rows = session.execute(query.limit(page_size).offset((page - 1) * page_size))
     return {
         "items": convertProducts(rows),
@@ -158,7 +212,7 @@ def get_suggestions(
 def get_product(product_id: int, session: Session = Depends(get_session)):
     # the latest price, the cheapest store if several share the latest scrape
     row = session.execute(
-        select(db.Product, db.Price)
+        select(db.Product, db.Price, UNIT_PRICE, PRICE_UNIT)
         .join(db.Product.prices)
         .where(db.Product.id == product_id)
         .order_by(db.Price.scraped_at.desc(), db.Price.price)

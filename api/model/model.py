@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict
 
 # Response shapes, built from the entities in api/entity/entities.py.
@@ -47,6 +47,8 @@ class ProductWithPrice(Product):
     discount_rate: Optional[int] = None
     in_stock: bool
     scraped_at: datetime
+    unit_price: Optional[float] = None  # price per kg, L or piece; None without a size
+    price_unit: Optional[Literal["kg", "l", "adet"]] = None
 
 
 class ProductPage(BaseModel):
