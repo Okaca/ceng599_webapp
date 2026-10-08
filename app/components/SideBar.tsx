@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Category } from "../types";
 
 interface SideBarProps {
@@ -9,22 +9,34 @@ interface SideBarProps {
 }
 
 // The category tree: main > sub. Clicking a category selects it and opens its
-// subcategories; the branch of the selected category is always open.
+// subcategories; clicking the selected one again closes it. The arrow only opens
+// and closes.
 const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelect }) => {
-  // slugs of the categories the user opened or closed by clicking
-  const [toggled, setToggled] = useState<Set<string>>(new Set());
+  // slugs of the categories whose subcategories are shown
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
-  // A category picked from the search bar opens its main category too
-  const isOpen = (slug: string) =>
-    toggled.has(slug) !== (selected !== null && selected.startsWith(slug + "/"));
+  // A selected subcategory opens its main category, also when it was picked from
+  // the search bar; nothing closes a category except the user
+  useEffect(() => {
+    if (!selected?.includes("/")) return;
+    const main = selected.split("/")[0];
+    setOpen((current) => (current.has(main) ? current : new Set(current).add(main)));
+  }, [selected]);
 
-  const handleClick = (category: Category) => {
-    setToggled((current) => {
+  const toggle = (slug: string, isOpen: boolean) =>
+    setOpen((current) => {
       const next = new Set(current);
-      if (next.has(category.slug)) next.delete(category.slug);
-      else next.add(category.slug);
+      if (isOpen) next.add(slug);
+      else next.delete(slug);
       return next;
     });
+
+  const handleClick = (category: Category) => {
+    if (category.children.length > 0) {
+      const isOpen = open.has(category.slug);
+      // Opens a closed category; closes it only when it is already the selected one
+      toggle(category.slug, !(isOpen && selected === category.slug));
+    }
     onCategorySelect(category.slug);
   };
 
@@ -40,9 +52,14 @@ const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelec
         <span>{category.name}</span>
         {category.children.length > 0 && (
           <svg
-            className={`w-5 h-5 transform transition-transform ${
-              isOpen(category.slug) ? "rotate-90" : ""
+            className={`w-5 h-5 shrink-0 transform transition-transform ${
+              open.has(category.slug) ? "rotate-90" : ""
             }`}
+            onClick={(event) => {
+              // only open or close, without selecting the category
+              event.stopPropagation();
+              toggle(category.slug, !open.has(category.slug));
+            }}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -57,7 +74,7 @@ const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelec
           </svg>
         )}
       </div>
-      {isOpen(category.slug) &&
+      {open.has(category.slug) &&
         category.children.map((child) => renderCategory(child, depth + 1))}
     </div>
   );
