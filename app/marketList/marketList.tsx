@@ -6,16 +6,13 @@ import { DEFAULT_PAGE_SIZE, MARKET_LABELS, MarketName, ProductPage } from "../ty
 
 interface MarketListProps {
   market: MarketName;
-  category?: string; // a category slug; all categories when omitted
-  q?: string; // words the product names must contain
-  onTotal?: (total: number) => void; // told how many products match, once known
 }
 
 const dp = new Dataprovider();
 
-// One market's products, optionally of one category and matching a search, fetched
-// from the API one page at a time
-const MarketList: React.FC<MarketListProps> = ({ market, category, q, onTotal }) => {
+// All of one market's products, fetched from the API one page at a time. The home
+// page shows one per market; searches and categories use GroupList instead.
+const MarketList: React.FC<MarketListProps> = ({ market }) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<ProductPage | null>(null);
@@ -24,26 +21,18 @@ const MarketList: React.FC<MarketListProps> = ({ market, category, q, onTotal })
     // A response that arrives after the user moved to another page is dropped,
     // so a slow earlier request can't overwrite the page they're looking at
     let current = true;
-    dp.getProducts({ market, category, q, page, pageSize }).then((result: ProductPage) => {
-      if (current) {
-        setData(result);
-        onTotal?.(result.total);
-      }
+    dp.getProducts({ market, page, pageSize }).then((result: ProductPage) => {
+      if (current) setData(result);
     });
     return () => {
       current = false;
     };
-    // onTotal is left out: a new function each render of the parent would refetch
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [market, category, q, page, pageSize]);
+  }, [market, page, pageSize]);
 
   const changePageSize = (size: number) => {
     setPageSize(size);
     setPage(1);
   };
-
-  // A market with nothing in the chosen category or search is left out of the comparison
-  if ((category || q) && data?.total === 0) return null;
 
   return (
     <div style={{ marginBottom: "20px" }}>

@@ -1,10 +1,12 @@
 "use client";
 import MarketList from "./marketList/marketList";
+import GroupList from "./marketList/GroupList";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Chip } from "@nextui-org/react";
 import SideBar from "./components/SideBar";
 import Dataprovider from "./dataProvider/dataProvider";
-import { Category, MARKETS, MarketName } from "./types";
+import { Category, MARKETS } from "./types";
 
 const dp = new Dataprovider();
 
@@ -17,33 +19,33 @@ function findCategory(categories: Category[], slug: string): Category | undefine
   }
 }
 
+// The home page URL for a search and a category, either of them optional
+function homeUrl(q?: string, category?: string | null) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (category) params.set("category", category);
+  const query = params.toString();
+  return query ? `/?${query}` : "/";
+}
+
 function Home() {
-  // The search and the category live in the URL (/?q=starking, /?category=meyve-sebze),
+  // The search and the category live in the URL (/?q=portakal&category=meyve-sebze/meyve),
   // so the search bar in the top bar can set them and the back button works
   const router = useRouter();
   const searchParams = useSearchParams();
   const q = searchParams.get("q")?.trim() || undefined;
-  const categorySlug = searchParams.get("category");
+  const categorySlug = searchParams.get("category") || undefined;
 
   const [categories, setCategories] = useState<Category[]>([]);
-  // How many products each market has for a filter, keyed by `${filter}|${market}`,
-  // to tell when no market has any
-  const [totals, setTotals] = useState<Record<string, number>>({});
 
   useEffect(() => {
     dp.getCategories().then(setCategories);
   }, []);
 
-  const filter = `${q ?? ""}|${categorySlug ?? ""}`;
   const category = categorySlug ? findCategory(categories, categorySlug) : undefined;
-  const nothingFound =
-    (q || categorySlug) && MARKETS.every((market) => totals[`${filter}|${market}`] === 0);
 
-  const reportTotal = (market: MarketName) => (total: number) =>
-    setTotals((current) => ({ ...current, [`${filter}|${market}`]: total }));
-
-  const selectCategory = (slug: string | null) =>
-    router.push(slug ? `/?category=${encodeURIComponent(slug)}` : "/");
+  // Picking a category during a search narrows the search instead of replacing it
+  const selectCategory = (slug: string | null) => router.push(homeUrl(q, slug));
 
   return (
     <>
@@ -51,30 +53,39 @@ function Home() {
         <div style={{ flex: "0 0 25%", padding: "20px" }}>
           <SideBar
             categories={categories}
-            selected={categorySlug}
+            selected={categorySlug ?? null}
             onCategorySelect={selectCategory}
           />
         </div>
-        <div style={{ flex: "1", padding: "20px" }}>
-          {q && <h1 className="text-center text-2xl font-bold">&ldquo;{q}&rdquo; için sonuçlar</h1>}
-          {category && <h1 className="text-center text-2xl font-bold">{category.name}</h1>}
-          {nothingFound && <p className="mt-8 text-center">Hiçbir markette eşleşen ürün yok.</p>}
-          {/* Every MarketList fetches its own first page as soon as it mounts, so
-              all five requests run at the same time and each market appears as
-              soon as its own response arrives. The API defaults to the day each
-              market was last scraped. Keying on the filter starts each list from
-              page 1 when the search or category changes. */}
-          <div>
-            {MARKETS.map((market) => (
-              <MarketList
-                key={`${market}|${filter}`}
-                market={market}
-                category={categorySlug ?? undefined}
-                q={q}
-                onTotal={reportTotal(market)}
-              />
-            ))}
-          </div>
+        <div style={{ flex: "1", padding: "20px", minWidth: 0 }}>
+          {q || categorySlug ? (
+            <>
+              {/* What the comparison is filtered by; × removes one filter */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {q && (
+                  <Chip size="lg" variant="flat" onClose={() => router.push(homeUrl(undefined, categorySlug))}>
+                    &ldquo;{q}&rdquo;
+                  </Chip>
+                )}
+                {categorySlug && (
+                  <Chip size="lg" variant="flat" onClose={() => router.push(homeUrl(q, null))}>
+                    {category?.name ?? categorySlug}
+                  </Chip>
+                )}
+              </div>
+              {/* Keyed on the filters, so a new search starts from page 1 */}
+              <GroupList key={`${q ?? ""}|${categorySlug ?? ""}`} q={q} category={categorySlug} />
+            </>
+          ) : (
+            // Every MarketList fetches its own first page as soon as it mounts, so all
+            // five requests run at the same time and each market appears as soon as its
+            // own response arrives. The API defaults to the day each market was last scraped.
+            <div>
+              {MARKETS.map((market) => (
+                <MarketList key={market} market={market} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>
