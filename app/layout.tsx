@@ -1,4 +1,5 @@
 import NavBar from "./components/NavBar";
+import ServiceWorker from "./components/ServiceWorker";
 import "./globals.css";
 import { Inter } from "next/font/google";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className={inter.className}>
+        <ServiceWorker />
         <div className="flex flex-col min-h-screen">
           <NavBar />
           <main>{children}</main>
