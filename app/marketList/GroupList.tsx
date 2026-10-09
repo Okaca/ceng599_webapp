@@ -50,14 +50,14 @@ const GroupList: React.FC<GroupListProps> = ({ q, category }) => {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4 px-2 py-4">
+      <div className="flex flex-col gap-3 px-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <span className="text-default-500">
           {data ? `${data.total} ürün` : ""}
         </span>
         <Select
           label="Sırala"
           size="sm"
-          className="w-64"
+          className="w-full sm:w-64"
           selectedKeys={[sort]}
           disallowEmptySelection
           onChange={(event) => changeSort(event.target.value as Sort)}

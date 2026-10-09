@@ -11,7 +11,8 @@ interface PagerProps {
   onPageSizeChange: (pageSize: number) => void;
 }
 
-// Page buttons plus a page size picker, e.g. "31-60 / 18556   < 1 2 3 ... >   [30]"
+// Page buttons plus a page size picker, e.g. "31-60 / 18556   < 1 2 3 ... >   [30]".
+// On phones the page buttons get a row of their own, above the range and the picker.
 const Pager: React.FC<PagerProps> = ({
   page,
   pageSize,
@@ -24,20 +25,22 @@ const Pager: React.FC<PagerProps> = ({
   const last = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex flex-wrap justify-center items-center gap-4 px-8">
-      <span className="text-small text-default-500">
+    <div className="flex flex-wrap items-center justify-center gap-3 px-2 sm:gap-4 sm:px-8">
+      <span className="order-2 text-small text-default-500 sm:order-1">
         {first}-{last} / {total}
       </span>
-      <Pagination
-        total={pages}
-        page={page}
-        onChange={onPageChange}
-        showControls
-        isCompact
-      />
+      <div className="order-1 flex w-full justify-center sm:order-2 sm:w-auto">
+        <Pagination
+          total={pages}
+          page={page}
+          onChange={onPageChange}
+          showControls
+          isCompact
+        />
+      </div>
       <Select
         aria-label="Sayfa başına ürün"
-        className="w-24"
+        className="order-3 w-24"
         size="sm"
         selectedKeys={[String(pageSize)]}
         disallowEmptySelection
