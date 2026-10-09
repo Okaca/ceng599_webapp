@@ -54,16 +54,21 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        <div className="flex justify-center pt-6">
-          <Card className="p-6 w-3/4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-12">
+        <div className="flex justify-center pt-2 md:pt-6">
+          {/* full width on phones, three quarters of its column from 768 px */}
+          <Card className="w-full p-3 sm:p-6 md:w-3/4">
             <CardHeader className="flex justify-center gap-3">
-              <Image
-                className="object-cover rounded-xl"
-                src={product.image_url ?? undefined}
-                width="auto"
-                alt={product.name}
-              />
+              {product.image_url ? (
+                <Image
+                  className="max-h-72 rounded-xl object-contain"
+                  src={product.image_url}
+                  alt={product.name}
+                  removeWrapper
+                />
+              ) : (
+                <span className="text-small text-default-400">Görsel yok</span>
+              )}
             </CardHeader>
             <Divider />
             <CardBody>
@@ -111,14 +116,20 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
           </Card>
         </div>
 
-        <div className="flex justify-center items-center p-6">
-          <ResponsiveContainer width="100%" height={400}>
+        {/* shorter on phones; the chart fills whatever height its box has */}
+        <div className="h-64 w-full p-2 md:h-[400px] md:p-6">
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={pastData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              margin={{ top: 20, right: 20, left: 0, bottom: 5 }}
             >
               <CartesianGrid stroke="hsl(var(--muted))" />
-              <XAxis dataKey="scraped_at" tickFormatter={formatDate} />
+              {/* skips date labels that would overlap on a narrow chart */}
+              <XAxis
+                dataKey="scraped_at"
+                tickFormatter={formatDate}
+                minTickGap={24}
+              />
               <YAxis tickFormatter={formatPrice} domain={[0, "auto"]} />
               <Tooltip
                 labelFormatter={formatDate}
@@ -139,9 +150,46 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
       </div>
 
       {offers.length > 1 && (
-        <div className="mx-auto max-w-3xl px-6 pb-10">
+        <div className="mx-auto max-w-3xl px-3 pb-10 sm:px-6">
           <h2 className="mb-3 text-xl font-bold">Tüm marketlerde</h2>
-          <table className="w-full text-left">
+          {/* Phones: one stacked row per market */}
+          <ul className="sm:hidden">
+            {offers.map((offer, index) => (
+              <li
+                key={offer.id}
+                className={`border-t border-default-200 px-2 py-3 ${offer.id === product.id ? "bg-default-100" : ""} ${
+                  offer.in_stock ? "" : "opacity-50"
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-2 font-bold">
+                  <span>
+                    {index === 0 && offer.in_stock && "★ "}
+                    {MARKET_LABELS[offer.market]}
+                  </span>
+                  <span>
+                    {offer.in_stock ? formatPrice(offer.price) : "Stokta yok"}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between gap-2 text-small">
+                  {offer.id === product.id ? (
+                    <span>{offer.name}</span>
+                  ) : (
+                    <NextLink
+                      href={`/product/?id=${offer.id}`}
+                      className="underline"
+                    >
+                      {offer.name}
+                    </NextLink>
+                  )}
+                  <span className="shrink-0 text-default-500">
+                    {formatUnitPrice(offer) ?? ""}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {/* From 640 px: a table */}
+          <table className="hidden w-full text-left sm:table">
             <thead className="text-small text-default-500">
               <tr>
                 <th className="py-2">Market</th>
