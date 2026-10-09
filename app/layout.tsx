@@ -4,8 +4,24 @@ import { Inter } from "next/font/google";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// Next.js puts these links into the page as written, without the base path the site
+// lives under (/marketScraper), so it is added here
+const base = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 export const metadata = {
   title: "Market Karşılaştırma",
+  description:
+    "A101, CarrefourSA, Getir, Migros ve ŞOK fiyatlarını yan yana karşılaştırın.",
+  // installable as an app: name, icons and colors are in public/manifest.json
+  manifest: `${base}/manifest.json`,
+  themeColor: "#16a34a",
+  // iPhone: full-screen launch and the name under the home-screen icon; the icon
+  // itself is app/apple-icon.png, which Next.js links with the base path by itself
+  appleWebApp: {
+    capable: true,
+    title: "Market",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({
