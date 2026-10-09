@@ -35,33 +35,24 @@ const MarketList: React.FC<MarketListProps> = ({ market }) => {
   };
 
   return (
-    <div style={{ marginBottom: "20px" }}>
+    <div className="mb-5">
+      {/* Sticks just below the top bar, whose height differs per screen size; z-20
+          keeps it under the top bar (z-30) and the category drawer (z-50) */}
       <div
-        style={{
-          position: "sticky",
-          top: 68,
-          width: "100%",
-          background: "white",
-          zIndex: 999,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "10vh",
-        }}
+        className="sticky z-20 flex w-full items-center justify-center bg-white py-3 sm:py-5"
+        style={{ top: "var(--nav-height)" }}
       >
         <h1
-          style={{
-            fontWeight: "bold",
-            fontFamily: "Arial, sans-serif",
-            fontSize: "25px",
-          }}
+          className="text-xl font-bold sm:text-[25px]"
+          style={{ fontFamily: "Arial, sans-serif" }}
         >
           {MARKET_LABELS[market]}
         </h1>
       </div>
       {data ? (
         <div>
-          <div className="grid grid-cols-6 gap-8 p-8">
+          {/* 2 cards per row on phones, up to 6 on wide screens */}
+          <div className="grid grid-cols-2 gap-3 p-2 sm:grid-cols-3 sm:gap-6 sm:p-6 md:grid-cols-4 xl:grid-cols-6 xl:gap-8 xl:p-8">
             {data.items.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
