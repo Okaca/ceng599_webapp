@@ -5,9 +5,10 @@ import { Suspense, useEffect, useRef } from "react";
 import InstallButton from "./InstallButton";
 import SearchBar from "./SearchBar";
 
-// The top bar. Phones: the logo above a full-width search box. From 640 px: the logo
-// on the left and the search box centered on the page, as the empty right column is
-// as wide as the logo's. The logo leads back to all products.
+// The top bar. Phones: the logo and, on the right, the install button, above a
+// full-width search box. From 640 px: the logo on the left, the search box centered on
+// the page and the install button on the right; the outer columns are equally wide, so
+// the search box stays centered. The logo leads back to all products.
 const NavBar = () => {
   const bar = useRef<HTMLDivElement>(null);
 
@@ -30,23 +31,24 @@ const NavBar = () => {
   return (
     <div
       ref={bar}
-      className="sticky top-0 z-30 flex w-full flex-col gap-2 bg-slate-200 px-3 py-2 sm:grid sm:grid-cols-[1fr_minmax(0,36rem)_1fr] sm:items-center sm:gap-8 sm:px-8 sm:py-3"
+      className="sticky top-0 z-30 grid w-full grid-cols-[1fr_auto] items-center gap-2 bg-slate-200 px-3 py-2 sm:grid-cols-[1fr_minmax(0,36rem)_1fr] sm:gap-8 sm:px-8 sm:py-3"
     >
-      {/* leftmost: the install button (shown only where installing is possible), then the logo */}
-      <div className="flex items-center gap-1 sm:justify-self-start">
-        <Link
-          href="/"
-          className="whitespace-nowrap text-lg font-bold sm:text-2xl"
-        >
-          Market Comparer
-        </Link>
-      </div>
+      <Link
+        href="/"
+        className="col-start-1 row-start-1 justify-self-start whitespace-nowrap text-lg font-bold sm:text-2xl"
+      >
+        Market Comparer
+      </Link>
       {/* SearchBar reads the URL's ?q=, which Next.js only knows in the browser */}
-      <Suspense>
-        <SearchBar />
-      </Suspense>
-      <InstallButton />
-      <div className="hidden sm:block" />
+      <div className="col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+        <Suspense>
+          <SearchBar />
+        </Suspense>
+      </div>
+      {/* rightmost; shown only where installing is possible */}
+      <div className="col-start-2 row-start-1 justify-self-end sm:col-start-3">
+        <InstallButton />
+      </div>
     </div>
   );
 };
