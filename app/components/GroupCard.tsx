@@ -46,7 +46,7 @@ const GroupCard: React.FC<{ group: ProductGroup }> = ({ group }) => {
               <li key={offer.id}>
                 <Link
                   href={`/product/?id=${offer.id}`}
-                  className={`flex items-baseline justify-between gap-2 rounded-md px-2 py-1 hover:bg-default-100 ${
+                  className={`flex min-h-[44px] items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-default-100 ${
                     isWinner ? "bg-success-50 font-bold" : ""
                   } ${offer.in_stock ? "" : "opacity-50"}`}
                 >
