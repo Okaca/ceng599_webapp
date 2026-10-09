@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useRef } from "react";
+import InstallButton from "./InstallButton";
 import SearchBar from "./SearchBar";
 
 // The top bar. Phones: the logo above a full-width search box. From 640 px: the logo
@@ -31,16 +32,20 @@ const NavBar = () => {
       ref={bar}
       className="sticky top-0 z-30 flex w-full flex-col gap-2 bg-slate-200 px-3 py-2 sm:grid sm:grid-cols-[1fr_minmax(0,36rem)_1fr] sm:items-center sm:gap-8 sm:px-8 sm:py-3"
     >
-      <Link
-        href="/"
-        className="whitespace-nowrap text-lg font-bold sm:justify-self-start sm:text-2xl"
-      >
-        Market Comparer
-      </Link>
+      {/* leftmost: the install button (shown only where installing is possible), then the logo */}
+      <div className="flex items-center gap-1 sm:justify-self-start">
+        <Link
+          href="/"
+          className="whitespace-nowrap text-lg font-bold sm:text-2xl"
+        >
+          Market Comparer
+        </Link>
+      </div>
       {/* SearchBar reads the URL's ?q=, which Next.js only knows in the browser */}
       <Suspense>
         <SearchBar />
       </Suspense>
+      <InstallButton />
       <div className="hidden sm:block" />
     </div>
   );
