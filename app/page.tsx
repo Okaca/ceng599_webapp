@@ -3,7 +3,7 @@ import MarketList from "./marketList/marketList";
 import GroupList from "./marketList/GroupList";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Chip } from "@nextui-org/react";
+import { Chip } from "@nextui-org/react";
 import CategoryDrawer from "./components/CategoryDrawer";
 import SideBar from "./components/SideBar";
 import Dataprovider from "./dataProvider/dataProvider";
@@ -81,13 +81,16 @@ function Home() {
           />
         </CategoryDrawer>
         <div className="min-w-0 flex-1 p-2 sm:p-5">
-          <Button
-            variant="flat"
-            className="mb-3 lg:hidden"
-            onPress={() => setIsDrawerOpen(true)}
+          {/* A plain button opening on click, not NextUI's onPress: onPress fires when
+              the finger lifts, and the click a phone sends right after then lands on the
+              drawer's freshly shown backdrop and closes it again at once */}
+          <button
+            type="button"
+            className="mb-3 flex h-10 items-center gap-2 rounded-xl bg-default-100 px-4 text-small hover:bg-default-200 lg:hidden"
+            onClick={() => setIsDrawerOpen(true)}
           >
             ☰ Kategoriler
-          </Button>
+          </button>
           {q || categorySlug ? (
             <>
               {/* What the comparison is filtered by; × removes one filter */}
