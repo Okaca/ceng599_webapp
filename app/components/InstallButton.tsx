@@ -15,6 +15,14 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+// Kept by the script at the top of the page (layout.tsx), which catches the event even
+// when it fires before this button exists, and announces it with "installpromptready"
+declare global {
+  interface Window {
+    __installPrompt?: BeforeInstallPromptEvent;
+  }
+}
+
 // Material Icons' "install_mobile" (Apache-2.0): a phone with a down arrow
 const InstallIcon = () => (
   <svg
@@ -51,19 +59,18 @@ const InstallButton = () => {
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1),
     );
 
-    const keepPrompt = (event: Event) => {
-      // keeps Chrome from showing its own install banner; the button offers it instead
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-    };
+    // An announcement that came before this button started, and any that come later
+    const takePrompt = () => setInstallPrompt(window.__installPrompt ?? null);
+    takePrompt();
     const markInstalled = () => {
+      window.__installPrompt = undefined;
       setIsInstalled(true);
       setInstallPrompt(null);
     };
-    window.addEventListener("beforeinstallprompt", keepPrompt);
+    window.addEventListener("installpromptready", takePrompt);
     window.addEventListener("appinstalled", markInstalled);
     return () => {
-      window.removeEventListener("beforeinstallprompt", keepPrompt);
+      window.removeEventListener("installpromptready", takePrompt);
       window.removeEventListener("appinstalled", markInstalled);
     };
   }, []);
@@ -77,6 +84,7 @@ const InstallButton = () => {
     await installPrompt.prompt();
     await installPrompt.userChoice;
     // the browser's prompt can be shown only once; it sends a new event when allowed again
+    window.__installPrompt = undefined;
     setInstallPrompt(null);
   };
 

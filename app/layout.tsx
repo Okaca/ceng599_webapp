@@ -25,6 +25,15 @@ export const metadata = {
   },
 };
 
+// Chrome announces that the site can be installed (beforeinstallprompt) early during
+// page load, often before React has started and the install button listens. This runs
+// first, keeps the announcement for the button (InstallButton.tsx) and tells it.
+const keepInstallPrompt = `window.addEventListener("beforeinstallprompt", function (event) {
+  event.preventDefault();
+  window.__installPrompt = event;
+  window.dispatchEvent(new Event("installpromptready"));
+});`;
+
 export default function RootLayout({
   children,
 }: {
@@ -32,6 +41,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: keepInstallPrompt }} />
+      </head>
       <body className={inter.className}>
         <ServiceWorker />
         <div className="flex flex-col min-h-screen">
