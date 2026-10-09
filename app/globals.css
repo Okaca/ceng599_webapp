@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* The top bar's height; NavBar.tsx sets the real value as soon as it has measured itself */
+:root {
+  --nav-height: 68px;
+}

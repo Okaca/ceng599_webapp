@@ -109,7 +109,7 @@ const SearchBar = () => {
         value={text}
         placeholder="Ürün ara, ör. starking elma"
         aria-label="Ürün ara"
-        className="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-gray-500"
+        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-base outline-none focus:border-gray-500"
         onChange={(event) => {
           setText(event.target.value);
           setHighlighted(0);
