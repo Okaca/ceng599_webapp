@@ -66,7 +66,7 @@ const MarketList: React.FC<MarketListProps> = ({ market }) => {
           />
         </div>
       ) : (
-        <p className="text-center">Loading...</p>
+        <p className="text-center">Yükleniyor...</p>
       )}
     </div>
   );

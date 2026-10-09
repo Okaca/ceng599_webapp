@@ -26,8 +26,8 @@ const ProductView = () => {
     fetchData();
   }, [id]);
 
-  if (isLoading) return <p>Loading...</p>;
-  if (!product) return <p>Product not found.</p>;
+  if (isLoading) return <p className="p-4 text-center">Yükleniyor...</p>;
+  if (!product) return <p className="p-4 text-center">Ürün bulunamadı.</p>;
   return (
     <div>
       <ProductDetails product={product} />
