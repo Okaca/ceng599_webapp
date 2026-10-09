@@ -24,26 +24,42 @@ Sort = Literal["unit_price", "price"]
 ISTANBUL = timezone(timedelta(hours=3))
 
 
-def latest_day(session: Session, market: Optional[str]) -> date:
-    """The last (Istanbul) day the market, or any market, was scraped; today if never.
-    Lists default to it, so they aren't empty before the 06:00 scrape or after a
-    market's scrape failed."""
-    query = select(func.max(db.Price.scraped_at))
-    if market:
-        query = query.join(db.Price.product).join(db.Product.market).where(db.Market.name == market)
-    latest = session.scalar(query)
-    return latest.astimezone(ISTANBUL).date() if latest else datetime.now(ISTANBUL).date()
-
-
 def latest_days(session: Session) -> dict[int, date]:
-    """Each market's last scrape day of the past two weeks, by market id"""
-    rows = session.execute(
-        select(db.Product.market_id, func.max(db.Price.scraped_at))
+    """Each market's last scrape day of the past two weeks, by market id; markets not
+    scraped in that time are absent.
+
+    Per market it asks for the newest price (ORDER BY scraped_at DESC LIMIT 1), which
+    Postgres answers by reading idx_prices_scraped_at from the newest end and stopping
+    at the market's first price: a few rows, however long the price history grows. The
+    two-week bound keeps a market that stopped being scraped from walking all of it."""
+    since = datetime.now(ISTANBUL) - timedelta(days=14)
+    newest_price = (
+        select(db.Price.scraped_at)
         .join(db.Price.product)
-        .where(db.Price.scraped_at >= datetime.now(ISTANBUL) - timedelta(days=14))
-        .group_by(db.Product.market_id)
+        .where(db.Product.market_id == db.Market.id, db.Price.scraped_at >= since)
+        .order_by(db.Price.scraped_at.desc())
+        .limit(1)
+        .scalar_subquery()
     )
-    return {market_id: latest.astimezone(ISTANBUL).date() for market_id, latest in rows}
+    rows = session.execute(select(db.Market.id, newest_price))
+    return {
+        market_id: latest.astimezone(ISTANBUL).date()
+        for market_id, latest in rows
+        if latest is not None
+    }
+
+
+def latest_day(session: Session, market: Optional[str]) -> date:
+    """The last (Istanbul) day the market, or any market, was scraped in the past two
+    weeks; today if none. Lists default to it, so they aren't empty before the 06:00
+    scrape or after a market's scrape failed."""
+    days = latest_days(session)
+    if market:
+        market_id = session.scalar(select(db.Market.id).where(db.Market.name == market))
+        day = days.get(market_id)
+    else:
+        day = max(days.values(), default=None)
+    return day or datetime.now(ISTANBUL).date()
 
 
 # The scraper stores sizes in g, ml or adet (kg and L are converted). A unit price is
