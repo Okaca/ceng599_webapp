@@ -3,7 +3,8 @@ import MarketList from "./marketList/marketList";
 import GroupList from "./marketList/GroupList";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Chip } from "@nextui-org/react";
+import { Button, Chip } from "@nextui-org/react";
+import CategoryDrawer from "./components/CategoryDrawer";
 import SideBar from "./components/SideBar";
 import Dataprovider from "./dataProvider/dataProvider";
 import { Category, MARKETS } from "./types";
@@ -11,7 +12,10 @@ import { Category, MARKETS } from "./types";
 const dp = new Dataprovider();
 
 // The category with this slug, searched through the whole tree
-function findCategory(categories: Category[], slug: string): Category | undefined {
+function findCategory(
+  categories: Category[],
+  slug: string,
+): Category | undefined {
   for (const category of categories) {
     if (category.slug === slug) return category;
     const child = findCategory(category.children, slug);
@@ -37,44 +41,84 @@ function Home() {
   const categorySlug = searchParams.get("category") || undefined;
 
   const [categories, setCategories] = useState<Category[]>([]);
+  // The category drawer, which replaces the sidebar on phones and tablets
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     dp.getCategories().then(setCategories);
   }, []);
 
-  const category = categorySlug ? findCategory(categories, categorySlug) : undefined;
+  const category = categorySlug
+    ? findCategory(categories, categorySlug)
+    : undefined;
 
   // Picking a category during a search narrows the search instead of replacing it
   const selectCategory = (slug: string | null) => router.push(homeUrl(q, slug));
 
   return (
     <>
-      <div style={{ display: "flex" }}>
-        <div style={{ flex: "0 0 25%", padding: "20px" }}>
+      <div className="flex">
+        {/* Desktop: the category tree beside the results */}
+        <aside className="hidden w-1/4 shrink-0 p-5 lg:block">
           <SideBar
             categories={categories}
             selected={categorySlug ?? null}
             onCategorySelect={selectCategory}
           />
-        </div>
-        <div style={{ flex: "1", padding: "20px", minWidth: 0 }}>
+        </aside>
+        {/* Phones and tablets: the same tree in a drawer; picking a category closes it */}
+        <CategoryDrawer
+          isOpen={isDrawerOpen}
+          onClose={() => setIsDrawerOpen(false)}
+        >
+          <SideBar
+            categories={categories}
+            selected={categorySlug ?? null}
+            onCategorySelect={(slug) => {
+              setIsDrawerOpen(false);
+              selectCategory(slug);
+            }}
+          />
+        </CategoryDrawer>
+        <div className="min-w-0 flex-1 p-2 sm:p-5">
+          <Button
+            variant="flat"
+            className="mb-3 lg:hidden"
+            onPress={() => setIsDrawerOpen(true)}
+          >
+            ☰ Kategoriler
+          </Button>
           {q || categorySlug ? (
             <>
               {/* What the comparison is filtered by; × removes one filter */}
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {q && (
-                  <Chip size="lg" variant="flat" onClose={() => router.push(homeUrl(undefined, categorySlug))}>
+                  <Chip
+                    size="lg"
+                    variant="flat"
+                    onClose={() =>
+                      router.push(homeUrl(undefined, categorySlug))
+                    }
+                  >
                     &ldquo;{q}&rdquo;
                   </Chip>
                 )}
                 {categorySlug && (
-                  <Chip size="lg" variant="flat" onClose={() => router.push(homeUrl(q, null))}>
+                  <Chip
+                    size="lg"
+                    variant="flat"
+                    onClose={() => router.push(homeUrl(q, null))}
+                  >
                     {category?.name ?? categorySlug}
                   </Chip>
                 )}
               </div>
               {/* Keyed on the filters, so a new search starts from page 1 */}
-              <GroupList key={`${q ?? ""}|${categorySlug ?? ""}`} q={q} category={categorySlug} />
+              <GroupList
+                key={`${q ?? ""}|${categorySlug ?? ""}`}
+                q={q}
+                category={categorySlug}
+              />
             </>
           ) : (
             // Every MarketList fetches its own first page as soon as it mounts, so all

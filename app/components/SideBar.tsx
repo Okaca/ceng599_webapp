@@ -11,7 +11,11 @@ interface SideBarProps {
 // The category tree: main > sub. Clicking a category selects it and opens its
 // subcategories; clicking the selected one again closes it. The arrow only opens
 // and closes.
-const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelect }) => {
+const SideBar: React.FC<SideBarProps> = ({
+  categories,
+  selected,
+  onCategorySelect,
+}) => {
   // slugs of the categories whose subcategories are shown
   const [open, setOpen] = useState<Set<string>>(new Set());
 
@@ -20,7 +24,9 @@ const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelec
   useEffect(() => {
     if (!selected?.includes("/")) return;
     const main = selected.split("/")[0];
-    setOpen((current) => (current.has(main) ? current : new Set(current).add(main)));
+    setOpen((current) =>
+      current.has(main) ? current : new Set(current).add(main),
+    );
   }, [selected]);
 
   const toggle = (slug: string, isOpen: boolean) =>
@@ -43,7 +49,7 @@ const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelec
   const renderCategory = (category: Category, depth: number) => (
     <div key={category.slug}>
       <div
-        className={`flex items-center justify-between py-2 pr-4 cursor-pointer hover:bg-gray-700 ${
+        className={`flex min-h-[44px] items-center justify-between py-2 pr-2 cursor-pointer hover:bg-gray-700 lg:min-h-0 ${
           selected === category.slug ? "bg-gray-700 font-bold" : ""
         }`}
         style={{ paddingLeft: `${16 + depth * 16}px` }}
@@ -51,27 +57,35 @@ const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelec
       >
         <span>{category.name}</span>
         {category.children.length > 0 && (
-          <svg
-            className={`w-5 h-5 shrink-0 transform transition-transform ${
-              open.has(category.slug) ? "rotate-90" : ""
-            }`}
+          // a finger-sized button around the arrow: it only opens or closes the
+          // category, without selecting it
+          <button
+            type="button"
+            aria-label={open.has(category.slug) ? "Kapat" : "Aç"}
+            aria-expanded={open.has(category.slug)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-600"
             onClick={(event) => {
-              // only open or close, without selecting the category
               event.stopPropagation();
               toggle(category.slug, !open.has(category.slug));
             }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M9 5l7 7-7 7"
-            ></path>
-          </svg>
+            <svg
+              className={`w-5 h-5 transform transition-transform ${
+                open.has(category.slug) ? "rotate-90" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M9 5l7 7-7 7"
+              ></path>
+            </svg>
+          </button>
         )}
       </div>
       {open.has(category.slug) &&
@@ -82,7 +96,7 @@ const SideBar: React.FC<SideBarProps> = ({ categories, selected, onCategorySelec
   return (
     <div className="w-full h-auto bg-gray-800 text-white flex flex-col">
       <div
-        className={`px-4 py-2 cursor-pointer hover:bg-gray-700 ${
+        className={`flex min-h-[44px] items-center px-4 py-2 cursor-pointer hover:bg-gray-700 lg:min-h-0 ${
           selected === null ? "bg-gray-700 font-bold" : ""
         }`}
         onClick={() => onCategorySelect(null)}
